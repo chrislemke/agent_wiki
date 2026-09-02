@@ -16,6 +16,7 @@ disposition: disputed
 author: Astro-Han
 resource: https://github.com/Astro-Han/karpathy-llm-wiki/blob/main/README.md
 ingested: 2026-09-02
+license: MIT
 ---
 
 # karpathy-llm-wiki README

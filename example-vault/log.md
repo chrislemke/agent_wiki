@@ -56,3 +56,7 @@
 
 ## [2026-09-02] ingest-failed | raw/Empty Clip.md
 - Note: Batch ingest (--all): the file is empty (0 bytes), nothing to read. Skipped; the batch continued. Kept as the example of the failure path; it stays in the backlog until the owner replaces or deletes it.
+
+## [2026-09-02] schema | licence noted on committed sources
+- Updated: [[karpathy-llm-wiki README]], [[karpathy-llm-wiki SKILL]]
+- Note: license: MIT recorded on the two source pages whose raw files are committed; metadata only, generated.at unchanged.

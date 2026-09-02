@@ -16,6 +16,7 @@ disposition: update
 author: Astro-Han
 resource: https://github.com/Astro-Han/karpathy-llm-wiki/blob/main/SKILL.md
 ingested: 2026-09-02
+license: MIT
 ---
 
 # karpathy-llm-wiki SKILL
