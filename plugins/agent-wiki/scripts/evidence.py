@@ -218,6 +218,7 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         result["errors"].append({"page": result["page"], "detail": "missing frontmatter"})
         return result
     raws_by_id: Dict[str, Tuple[str, str]] = {}  # id -> (rel raw path, content)
+    unavailable: Set[str] = set()  # ids whose raw file is listed as restorable but missing
     for entry in FM.as_list(data.get("sources")):
         if not isinstance(entry, dict):
             continue
@@ -239,6 +240,7 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         if not raw_path.is_file():
             file_key = raw_rel.split("/", 1)[1] if raw_rel.startswith("raw/") else raw_rel
             if file_key in restorable:
+                unavailable.add(sid)
                 result["restore"].append({"page": result["page"], "raw": raw_rel, "url": restorable[file_key]["url"], "detail": "raw file listed in SOURCES.md but missing locally; run fetch --restore"})
             else:
                 result["errors"].append({"page": result["page"], "detail": f"raw file missing: {raw_rel} (cited via [[{target}]])"})
@@ -246,7 +248,7 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         raws_by_id[sid] = (raw_rel, raw_body(raw_path))
     candidates = extract_candidates(body)
     if not raws_by_id:
-        if "sources" not in data:
+        if "sources" not in data and not unavailable:
             # no sources at all: every literal is ungrounded. An explicit `sources: []`
             # declares that the page grounds nothing (a hub page's editorial text) and is skipped.
             for c in candidates:
@@ -254,6 +256,10 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         return result
     all_raws = list(raws_by_id.values())
     for c in candidates:
+        # A literal that may live in a raw file that is missing but restorable cannot be judged;
+        # the restore finding covers it.
+        if unavailable and (not c.footnotes or any(f in unavailable for f in c.footnotes)):
+            continue
         if c.footnotes:
             targets = [raws_by_id[f] for f in c.footnotes if f in raws_by_id]
             footnote: Optional[str] = ",".join(c.footnotes)

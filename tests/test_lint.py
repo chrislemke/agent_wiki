@@ -181,3 +181,14 @@ def test_explicitly_empty_sources_suppresses_ungrounded_suspects(tmp_path: Path)
     r = run_script("evidence.py", "check", str(vault / "wiki/syntheses/Overview.md"), "--json")
     assert r.code == 0, r
     assert r.json()["suspects"] == []
+
+
+def test_restore_findings_are_reported_once_per_source_page(tmp_path: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    (vault / "raw/Note Taking Guide.md").unlink()
+    (vault / "raw/SOURCES.md").write_text("# Sources\n\n| Title | URL | File | Licence |\n|---|---|---|---|\n| Note Taking Guide | https://example.com/note-taking-guide | Note Taking Guide.md | CC0 |\n", encoding="utf-8")
+    code, data = findings(vault)
+    assert code == 0, data["judgement"]
+    restore = by_type(data, "restore")
+    assert len(restore) == 1 and restore[0]["page"].endswith("Note Taking Guide.md")
+    assert "evidence-suspect" not in types(data["judgement"])

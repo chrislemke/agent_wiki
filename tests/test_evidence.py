@@ -122,3 +122,20 @@ def test_text_report_and_vault_scope(vault: Path):
     r = run_script("evidence.py", "check", str(vault))
     assert r.code == 0, r
     assert "suspect" in r.out.lower()
+
+
+def test_literals_that_could_live_in_a_restorable_missing_raw_are_not_suspects(vault: Path):
+    setup(vault)
+    (vault / "raw/Ghostty Update.md").unlink()
+    (vault / "raw/SOURCES.md").write_text(
+        "# Sources\n\n| Title | URL | File | Licence |\n|---|---|---|---|\n| Ghostty Update | https://example.com/ghostty | Ghostty Update.md | not stated |\n",
+        encoding="utf-8",
+    )
+    body = "## Key facts\nStars: 42K.[^ghostty]\nForks grew to 3,020 last week.[^other]\nSomewhere it says 10,000 users.\nBut 77,777 appears nowhere.[^other]\n"
+    (vault / "wiki/entities/Ghostty.md").write_text(entity("Ghostty", body, [("ghostty", "Ghostty Update"), ("other", "Other Report")]), encoding="utf-8")
+    r = run_script("evidence.py", "check", str(vault / "wiki/entities/Ghostty.md"), "--json")
+    data = r.json()
+    # 42K (footnoted to the missing source) and 10,000 (unfootnoted, could be in it) are skipped;
+    # 77,777 is footnoted to a present source and is a real suspect
+    assert [s["value"] for s in data["suspects"]] == ["77,777"]
+    assert data["restore"] and data["errors"] == []

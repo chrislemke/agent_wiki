@@ -418,8 +418,7 @@ def check_evidence(ctx: Context) -> List[Finding]:
         out.append(finding("evidence-suspect", "judgement", s["page"], f"{s['kind']} {s['value']!r}{fn}: {s['detail']}", "check the raw source; correct the page or drop the precision", kind=s["kind"], value=s["value"], footnote=s.get("footnote")))
     for e in report["errors"]:
         out.append(finding("evidence-error", "judgement", e["page"], e["detail"], "fix the sources chain (source page, raw field, raw file)"))
-    for r in report["restore"]:
-        out.append(finding("restore", "informational", r["page"], r["detail"], "run fetch --restore", raw=r["raw"], url=r["url"]))
+    # restorable-but-missing raws are reported once, by check_rawhash on the source page
     return out
 
 
