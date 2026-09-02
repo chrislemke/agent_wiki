@@ -1,0 +1,14 @@
+{
+  "name": "agent-wiki",
+  "owner": {
+    "name": "Christopher Lemke",
+    "email": "christopher.lemke@invia.de"
+  },
+  "plugins": [
+    {
+      "name": "agent-wiki",
+      "source": "./plugins/agent-wiki",
+      "description": "An LLM-maintained wiki for Claude Code: Karpathy's LLM Wiki pattern plus the trust and provenance vocabulary of the Open Knowledge Format. Six skills (init, fetch, ingest, query, lint, verify) and four hooks that guard raw sources, provenance and the log."
+    }
+  ]
+}

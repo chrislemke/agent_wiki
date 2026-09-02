@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# macOS
+.DS_Store
+
+# Obsidian per-user state inside the example vault
+example-vault/.obsidian/workspace.json
+example-vault/.obsidian/workspace-mobile.json
+example-vault/.obsidian/cache
+example-vault/.trash/
+
+# Local Claude Code project settings of the maintainer (plugin enables); not part of the plugin
+/.claude/

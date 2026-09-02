@@ -1,0 +1,23 @@
+[project]
+name = "agent-wiki"
+version = "0.1.0"
+description = "Tests and tooling for the agent-wiki Claude Code plugin. The plugin scripts themselves are Python 3 standard library only."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["plugins/agent-wiki/scripts", "plugins/agent-wiki/hooks", "tests"]
+pythonVersion = "3.9"
+typeCheckingMode = "standard"
+reportMissingModuleSource = false

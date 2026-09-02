@@ -1,0 +1,21 @@
+{
+  "name": "agent-wiki",
+  "version": "0.1.0",
+  "description": "An LLM-maintained wiki for Claude Code. You collect sources, Claude writes and maintains an interlinked markdown wiki you read in Obsidian. Combines Karpathy's LLM Wiki pattern with the Open Knowledge Format's provenance, trust and freshness fields. Skills: init, fetch, ingest, query, lint, verify. Hooks guard the raw layer, human verification and the log.",
+  "author": {
+    "name": "Christopher Lemke",
+    "email": "christopher.lemke@invia.de"
+  },
+  "homepage": "https://github.com/chrislemke/agent_wiki",
+  "repository": "https://github.com/chrislemke/agent_wiki",
+  "license": "MIT",
+  "keywords": [
+    "wiki",
+    "knowledge-base",
+    "llm-wiki",
+    "obsidian",
+    "okf",
+    "provenance",
+    "notes"
+  ]
+}
