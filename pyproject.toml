@@ -17,6 +17,7 @@ addopts = "-q"
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+extraPaths = ["plugins/agent-wiki/scripts", "plugins/agent-wiki/hooks"]
 include = ["plugins/agent-wiki/scripts", "plugins/agent-wiki/hooks", "tests"]
 pythonVersion = "3.9"
 typeCheckingMode = "standard"

@@ -1,0 +1,64 @@
+{
+  "description": "Write-like shell operations whose target is inside the raw folder. Each pattern is a Python regular expression matched against the whole command; the token RAW expands to raw_target (a path ending in raw/). Read-only commands (cat, rg, grep, head, sed without -i, ls, wc) never match. Extend this list rather than the hook code.",
+  "deny": [
+    {
+      "name": "sed in place",
+      "pattern": "\\bsed\\s+(?:-[A-Za-z]*\\s+)*-[A-Za-z]*i[A-Za-z.]*(?:\\s+[^|;&]*)?RAW"
+    },
+    {
+      "name": "perl in place",
+      "pattern": "\\bperl\\s+[^|;&]*-[A-Za-z]*i[A-Za-z]*[^|;&]*RAW"
+    },
+    {
+      "name": "mv",
+      "pattern": "\\b(?:git\\s+)?mv\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "cp into raw",
+      "pattern": "\\bcp\\s+(?:-\\S+\\s+)*\\S+\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "rm",
+      "pattern": "\\b(?:git\\s+)?rm\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "tee",
+      "pattern": "\\btee\\s+(?:-\\S+\\s+)*[^|;&<]*RAW"
+    },
+    {
+      "name": "truncate",
+      "pattern": "\\btruncate\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "touch",
+      "pattern": "\\btouch\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "redirection",
+      "pattern": ">>?\\s*[\"']?(?:[^\\s\"'|;&]*/)?raw/"
+    },
+    {
+      "name": "inline interpreter",
+      "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*raw/"
+    },
+    {
+      "name": "install or dd",
+      "pattern": "\\b(?:install|dd|rsync|ln)\\s+[^|;&]*RAW"
+    }
+  ],
+  "allow": [
+    {
+      "name": "plugin fetch script",
+      "pattern": "/scripts/fetch\\.py\\b"
+    },
+    {
+      "name": "plugin verify script",
+      "pattern": "/scripts/verify\\.py\\b"
+    },
+    {
+      "name": "plugin scaffold script",
+      "pattern": "/scripts/scaffold\\.py\\b"
+    }
+  ],
+  "raw_target": "(?:[^\\s\"'|;&]*/)?raw/"
+}
