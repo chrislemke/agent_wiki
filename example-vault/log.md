@@ -50,3 +50,6 @@
 ## [2026-09-02] lint | 0 fixed, 0 proposed
 - Updated: [[Overview]]
 - Note: Clean structural pass. Fixed the filing of the previous lint: wanted pages are named in plain text there, so the filing does not count as a wanting page.
+
+## [2026-09-02] lint | fresh clone acceptance
+- Note: Fresh clone from GitHub with the plugin's own scripts under Python 3.9: lint reports 0 structural findings before restore and only restore and wanted-page informational findings; after fetch --restore the evidence check passes on all 14 pages with 0 suspects and 0 errors.
