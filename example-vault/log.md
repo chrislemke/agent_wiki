@@ -22,3 +22,8 @@
 
 ## [2026-09-02] schema | generic block v1
 - Note: Refreshed to the revised canonical wording (language setting, dispute block format, fidelity field); Overview declares sources: [].
+
+## [2026-09-02] ingest | karpathy-llm-wiki SKILL
+- Created: [[karpathy-llm-wiki SKILL]], [[karpathy-llm-wiki]], [[Grounding Invariant]]
+- Updated: [[LLM Wiki Pattern]], [[Andrej Karpathy]], [[Overview]]
+- Note: disposition: new, update. Batch mode. Wanted pages left: Cascade Updates, Status Blocks, Agent Skills.

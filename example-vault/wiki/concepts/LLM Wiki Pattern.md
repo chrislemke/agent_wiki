@@ -14,6 +14,8 @@ sources:
     page: "[[LLM Wiki]]"
   - id: kw-readme
     page: "[[karpathy-llm-wiki README]]"
+  - id: kw-skill
+    page: "[[karpathy-llm-wiki SKILL]]"
 ---
 
 # LLM Wiki Pattern
@@ -31,6 +33,8 @@ A personal or team knowledge base in which the LLM, not the human, writes and ma
 - [[karpathy-llm-wiki README]] implements the pattern as one Agent Skills skill with the same three operations, contrasts it with RAG (knowledge in curated pages, synthesis during ingest and maintenance, instead of raw chunks and synthesis at query time), and reports a production wiki of 94 articles, 13 topic directories and 99 sources maintained daily since April 2026.[^kw-readme]
 - The same README lists features deliberately left out after three months of production logs: source-hash freshness tracking, persisted line-number citations, numeric confidence scores, per-article review dates, access-based decay, retract machinery, automatic hooks (they "belong to the agent harness"), vector or graph search, typed relationship ontologies, OKF conformance, MCP servers and UIs.[^kw-readme]
 
+- [[karpathy-llm-wiki SKILL]] makes the operations concrete: triage every source into New, Update, Disputed or No material after searching the whole wiki; compile with the [[Grounding Invariant]]; run [[Cascade Updates]] across every affected article and mark contradicted or superseded claims with Status blocks instead of rewriting them; archive query answers as new pages; lint at three authority levels; and "compile one source at a time, because index.md, log.md, and cascade updates are shared state".[^kw-skill]
+
 ## Not to be confused with
 - Retrieval-augmented generation (RAG): documents are chunked and retrieved at query time; synthesis is redone for every question and nothing is written back. [[karpathy-llm-wiki README]] tabulates the difference: RAG suits broad retrieval across large corpora, the wiki suits compounding knowledge, summaries and durable cross-links.[^kw-readme]
 - A personal wiki maintained by hand: the pattern's point is that the LLM does the maintenance, which is why hand-maintained wikis are abandoned.
@@ -41,3 +45,4 @@ A personal or team knowledge base in which the LLM, not the human, writes and ma
 
 [^llm-wiki]: LLM Wiki
 [^kw-readme]: karpathy-llm-wiki README
+[^kw-skill]: karpathy-llm-wiki SKILL
