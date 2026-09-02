@@ -37,3 +37,8 @@
 - Created: [[LLM Wiki Versus RAG]]
 - Updated: [[Overview]]
 - Note: filed; 5 of 5 cited pages unverified
+
+## [2026-09-02] lint | 1 fixed, 2 proposed
+- Created: [[Agent Skills]], [[Cascade Updates]]
+- Updated: [[Grounding Invariant]], [[Overview]]
+- Note: Structural pass clean. Proposed and created two wanted pages (gate met: wanted by 3 and 2 pages). Semantic: added a cross-reference on Grounding Invariant; filed two open questions on the Overview (thin Claude Code page, single-source wanted pages).

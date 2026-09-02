@@ -20,7 +20,7 @@ sources:
 # Grounding Invariant
 
 ## Definition
-A wiki page may state a specific number, date or direct quote only if that literal appears, in exactly that form, in a raw source the page links. The rule has two halves: the writer locates the literal in the raw file before writing it and writes it as found, and a lint script later greps every high-signal literal in the linked raws and reports the misses as suspects. Because raw files never change, a page that passed once keeps passing, and the whole wiki can be re-checked in seconds.[^kw-skill]
+A wiki page may state a specific number, date or direct quote only if that literal appears, in exactly that form, in a raw source the page links. The rule has two halves: the writer locates the literal in the raw file before writing it and writes it as found, and a lint script later greps every high-signal literal in the linked raws and reports the misses as suspects. Because raw files never change, a page that passed once keeps passing, and the whole wiki can be re-checked in seconds.[^kw-skill] It is the truth rule of the [[LLM Wiki Pattern]].
 
 ## How sources treat it
 - [[karpathy-llm-wiki SKILL]] defines it: "Every load-bearing fact in wiki/ — numbers, dates, direct quotes — exists verbatim in the raw/ files linked by that article's Raw field." Compile establishes it, lint verifies it. Values are written as found ("if the source says 42K, write 42K, not 42,000"), derived values show their components, and a value that cannot be located is dropped or stated without precision.[^kw-skill]

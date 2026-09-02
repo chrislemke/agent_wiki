@@ -25,3 +25,5 @@ The agent-wiki plugin behind this vault combines two of the ingested sources: th
 
 ## Open questions
 - Which Claude Code documentation pages to ingest first: skills, hooks, or plugins?
+- [lint 2026-09-02] [[Claude Code]] is thin: three facts from two sources, none from Anthropic. Fetch the official documentation on skills, hooks and plugins ([[Claude Code]], [[Agent Skills]]).
+- [lint 2026-09-02] [[Obsidian]] and [[Status Blocks]] are each wanted by one page; a second source mentioning either would justify a page ([[LLM Wiki]], [[karpathy-llm-wiki SKILL]]).
