@@ -24,11 +24,11 @@ TODAY = __import__("datetime").date.today().isoformat()
 
 MARKER = {"schema_version": 1, "plugin_version": "0.1.0", "created": "2026-09-01"}
 
+GENERIC_BLOCK = (PLUGIN / "references" / "generic-block.md").read_text(encoding="utf-8").strip()
+
 CLAUDE_MD = """# Test Vault
 
-<!-- agent-wiki:generic v1 -->
-Generic conventions placeholder.
-<!-- /agent-wiki:generic -->
+""" + GENERIC_BLOCK + """
 
 <!-- agent-wiki:domain -->
 ## Domain
@@ -64,12 +64,12 @@ def page(type_: str, title: str, description: str = "A page.", **extra: object) 
         "  by: agent-wiki/test-model",
         "  at: 2026-09-01",
     ]
+    body = extra.pop("body", None)
     for key, value in extra.items():
         if isinstance(value, list):
             lines.append(f"{key}: [{', '.join(value)}]")
         else:
             lines.append(f"{key}: {value}")
-    body = extra.pop("body", None)
     lines.append("---")
     lines.append("")
     lines.append(f"# {title}")
@@ -98,8 +98,20 @@ def make_vault(root: Path, files: dict[str, str] | None = None, marker: dict | N
     return root
 
 
+def sync_generic_block(vault: Path) -> None:
+    """Replace the generic block in a vault's CLAUDE.md with the plugin's current canonical block."""
+    import re
+
+    claude = vault / "CLAUDE.md"
+    text = claude.read_text(encoding="utf-8")
+    pattern = re.compile(r"<!--\s*agent-wiki:generic\s+v\d+\s*-->.*?<!-- /agent-wiki:generic -->", re.S)
+    claude.write_text(pattern.sub(lambda m: GENERIC_BLOCK, text, count=1), encoding="utf-8")
+
+
 def copy_fixture(name: str, dest: Path) -> Path:
     shutil.copytree(FIXTURES / name, dest)
+    if (dest / "CLAUDE.md").exists():
+        sync_generic_block(dest)
     return dest
 
 

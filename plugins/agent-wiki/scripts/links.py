@@ -133,17 +133,29 @@ class Catalog:
             return self.files[target.split("/")[-1]][0]
         return None
 
-    def near_miss(self, target: str) -> Optional[str]:
+    def near_miss_candidates(self, target: str) -> List[str]:
+        """Existing names that look like typos of target: case-insensitive match or edit distance <= 2."""
         t = target.split("/")[-1]
-        lower = self.names_lower.get(t.lower())
-        if lower and lower != t:
-            return lower
-        best: Optional[Tuple[int, str]] = None
+        scored: List[Tuple[int, str]] = []
         for name in list(self.by_basename) + list(self.by_alias):
+            if name == t:
+                return []
+            if name.lower() == t.lower():
+                scored.append((0, name))
+                continue
             d = _levenshtein(t, name)
-            if d <= 2 and (best is None or d < best[0]):
-                best = (d, name)
-        return best[1] if best else None
+            if d <= 2:
+                scored.append((d, name))
+        scored.sort()
+        out: List[str] = []
+        for _, name in scored:
+            if name not in out:
+                out.append(name)
+        return out
+
+    def near_miss(self, target: str) -> Optional[str]:
+        candidates = self.near_miss_candidates(target)
+        return candidates[0] if candidates else None
 
     def duplicates(self) -> List[Dict[str, Any]]:
         out = []
