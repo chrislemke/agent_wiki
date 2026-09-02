@@ -13,6 +13,8 @@ sources:
     page: "[[karpathy-llm-wiki SKILL]]"
   - id: kw-readme
     page: "[[karpathy-llm-wiki README]]"
+  - id: okf-spec
+    page: "[[Open Knowledge Format Specification]]"
 ---
 
 # Grounding Invariant
@@ -25,6 +27,8 @@ A wiki page may state a specific number, date or direct quote only if that liter
 - The same file treats the script's output as candidates, not verdicts: derived values and product names show up as suspects and are judged against the raw context by the reader.[^kw-skill]
 - [[karpathy-llm-wiki README]] explains why the project stopped at whole-file grep and did not persist line-number citations: every fidelity error it observed was a value absent from the source, which a whole-file grep catches, and the annotation friction would make agents skip the rule.[^kw-readme]
 
+- [[Open Knowledge Format Specification]] adds the attribution half: a claim points at its source with a footnote whose label is a stable source id rather than a position, because "a positional index misattributes silently the moment the list is reordered". Together with the invariant this lets a checker test a footnoted literal against one named source instead of all of them.[^okf-spec]
+
 ## Not to be confused with
 - Verification by a human: the invariant is mechanical and says a literal exists in the source, not that the page is right or that anyone reviewed it.
 - Retrieval grounding in RAG: there the model sees retrieved chunks at answer time; here the check runs on the written page against immutable files.
@@ -35,3 +39,4 @@ A wiki page may state a specific number, date or direct quote only if that liter
 
 [^kw-skill]: karpathy-llm-wiki SKILL
 [^kw-readme]: karpathy-llm-wiki README
+[^okf-spec]: Open Knowledge Format Specification

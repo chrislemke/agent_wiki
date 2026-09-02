@@ -37,6 +37,7 @@ A personal or team knowledge base in which the LLM, not the human, writes and ma
 
 ## Not to be confused with
 - Retrieval-augmented generation (RAG): documents are chunked and retrieved at query time; synthesis is redone for every question and nothing is written back. [[karpathy-llm-wiki README]] tabulates the difference: RAG suits broad retrieval across large corpora, the wiki suits compounding knowledge, summaries and durable cross-links.[^kw-readme]
+- [[Open Knowledge Format]]: a format for the frontmatter of knowledge files, not a workflow. The pattern says how a wiki is maintained; OKF says how its pages record provenance, trust and freshness.
 - A personal wiki maintained by hand: the pattern's point is that the LLM does the maintenance, which is why hand-maintained wikis are abandoned.
 
 ## Open questions

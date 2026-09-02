@@ -27,3 +27,8 @@
 - Created: [[karpathy-llm-wiki SKILL]], [[karpathy-llm-wiki]], [[Grounding Invariant]]
 - Updated: [[LLM Wiki Pattern]], [[Andrej Karpathy]], [[Overview]]
 - Note: disposition: new, update. Batch mode. Wanted pages left: Cascade Updates, Status Blocks, Agent Skills.
+
+## [2026-09-02] ingest | Open Knowledge Format Specification
+- Created: [[Open Knowledge Format Specification]], [[Open Knowledge Format]]
+- Updated: [[Grounding Invariant]], [[LLM Wiki Pattern]], [[Overview]]
+- Note: disposition: new, update, disputed. Batch mode. Outdated block (README calls OKF a v0.1 draft; spec is 0.2) and Disputed block (per-page expiry dates) recorded on Open Knowledge Format.
