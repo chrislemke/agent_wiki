@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "agent-wiki": {
+      "source": {
+        "source": "github",
+        "repo": "chrislemke/agent_wiki"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agent-wiki@agent-wiki": true
+  }
+}
