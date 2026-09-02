@@ -8,22 +8,22 @@ All scripts live in `${CLAUDE_PLUGIN_ROOT}/scripts/` and run with `python3`. `${
 |---|---|
 | Find the vault | `vault.py detect [PATH] [--json]` (prints the root; `root` in JSON; exit 1 when no vault encloses the path) |
 | Read the domain settings | `vault.py settings [--vault V] --json` (booleans are the strings `"true"`/`"false"`) |
-| Stamp a page after writing it | `frontmatter.py stamp <page> --by agent-wiki/<model-id> [--vault V]` (sets `generated`, `created` and `stale_after`; `ingested` on source pages) |
+| Stamp a page after writing it | `frontmatter.py stamp <page> --by agent-wiki/<model-id> [--vault V] [--json]` (sets `generated`, `created` and `stale_after`; `ingested` on source pages) |
 | Validate frontmatter | `frontmatter.py validate <page or vault> [--json]` |
-| Set one scalar field | `frontmatter.py set <page> <key> <value>` (refuses `verified`) |
-| Canonical key order | `frontmatter.py normalize <page>...` |
+| Set one scalar field | `frontmatter.py set <page> <key> <value> [--json]` (refuses `verified`) |
+| Canonical key order | `frontmatter.py normalize <page>... [--json]` |
 | Resolve links | `links.py resolve <page or vault> [--json]` (exit 1 on wanted pages too) |
 | Inbound links to a page | `links.py inbound "<Title>" [--vault V] [--json]` (body links and `sources[].page`) |
-| Hash a raw file | `rawhash.py hash <raw file>` |
+| Hash a raw file | `rawhash.py hash <raw file> [--json]` |
 | Compare raw hashes | `rawhash.py compare <page or vault> [--json]` |
-| Regenerate indexes | `index.py build [--vault V]`; drift: `index.py check [--vault V] [--json]` |
-| Append a log entry | `log.py append --op <op> --title "<title>" [--created "<Page>" ...] [--updated "<Page>" ...] [--note "<text>"] [--vault V]` |
+| Regenerate indexes | `index.py build [--vault V] [--json]`; drift: `index.py check [--vault V] [--json]` |
+| Append a log entry | `log.py append --op <op> --title "<title>" [--created "<Page>" ...] [--updated "<Page>" ...] [--note "<text>"] [--vault V] [--json]` |
 | Read the log | `log.py tail <N> [--json]`, `log.py since-lint [--json]`, `log.py parse [--json]` |
-| Rename or merge pages | `rename.py rename <page> "<New Title>" [--vault V]`, `rename.py merge <loser> <winner> [--vault V]` |
+| Rename or merge pages | `rename.py rename <page> "<New Title>" [--vault V] [--json]`, `rename.py merge <loser> <winner> [--vault V] [--json]` |
 | Grounding check | `evidence.py check <page or vault> [--json]` |
 | All lint checks | `lint.py all [--vault V] [--scope <path>] [--fix] [--json]`; one checker: `lint.py <checker> [--vault V] [--json]` |
-| Fetch into raw | `fetch.py url <URL> [--stdin --fidelity summary --title T] [--json]`, `fetch.py github <repo URL> [--files A,B] [--json]`, `fetch.py restore [--json]`, `fetch.py plan-url <URL>` |
-| Record a human review | `verify.py <page> --by <human id> [--vault V]` |
+| Fetch into raw | `fetch.py url <URL> [--stdin --fidelity summary --title T] [--json]`, `fetch.py github <repo URL> [--files A,B] [--json]`, `fetch.py restore [--json]`, `fetch.py plan-url <URL> [--json]` |
+| Record a human review | `verify.py <page> --by <human id> [--vault V] [--json]` |
 | Scaffold a vault | `scaffold.py init --vault <dir> --answers answers.json --by agent-wiki/<model-id> [--json]`; `scaffold.py render-claude-md --answers answers.json` |
 
 `--created` and `--updated` take one or more page titles after the flag and may be repeated. Titles are written bare or as `[[Title]]`; the log gets `[[Title]]`.
