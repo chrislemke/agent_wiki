@@ -14,7 +14,7 @@ generated:
 A working reference on Claude Code and agentic coding practice: how the tool works, how to extend it with skills, hooks and plugins, and which working patterns hold up. This vault is also the example and dogfood vault of the agent-wiki plugin.
 
 ## Evidence
-- No sources ingested yet.
+- [[LLM Wiki]] is the founding text: the LLM compiles immutable raw sources into a wiki and keeps it current, the human curates and asks. Summarised as the [[LLM Wiki Pattern]].
 
 ## Open questions
-- Which sources to ingest first?
+- Which Claude Code documentation pages to ingest first: skills, hooks, or plugins?
