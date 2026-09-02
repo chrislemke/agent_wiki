@@ -21,6 +21,7 @@ The agent-wiki plugin behind this vault combines two of the ingested sources: th
 - [[karpathy-llm-wiki README]] shows the pattern in production as an Agent Skills skill and lists what its author chose not to build; it disagrees with the founding text on search tooling. Entities: [[Andrej Karpathy]], [[Claude Code]].
 - [[karpathy-llm-wiki SKILL]] supplies the operating rules, above all the [[Grounding Invariant]]; the repository has its own page, [[karpathy-llm-wiki]].
 - [[Open Knowledge Format Specification]] supplies the frontmatter vocabulary this vault uses for provenance, trust and freshness, summarised as the [[Open Knowledge Format]]. It disagrees with the karpathy-llm-wiki README on per-page expiry dates.
+- Filed answer: [[LLM Wiki Versus RAG]] contrasts the wiki with retrieval and states what OKF adds.
 
 ## Open questions
 - Which Claude Code documentation pages to ingest first: skills, hooks, or plugins?

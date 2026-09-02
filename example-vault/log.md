@@ -32,3 +32,8 @@
 - Created: [[Open Knowledge Format Specification]], [[Open Knowledge Format]]
 - Updated: [[Grounding Invariant]], [[LLM Wiki Pattern]], [[Overview]]
 - Note: disposition: new, update, disputed. Batch mode. Outdated block (README calls OKF a v0.1 draft; spec is 0.2) and Disputed block (per-page expiry dates) recorded on Open Knowledge Format.
+
+## [2026-09-02] query | How does an LLM wiki differ from RAG, and what does the Open Knowledge Format add on top?
+- Created: [[LLM Wiki Versus RAG]]
+- Updated: [[Overview]]
+- Note: filed; 5 of 5 cited pages unverified
