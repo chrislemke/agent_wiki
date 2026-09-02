@@ -46,3 +46,7 @@
 ## [2026-09-02] verify | LLM Wiki
 - Updated: [[LLM Wiki]]
 - Note: Recorded by the seeding run per spec 5 acceptance; the evidence check passed. Owner: read the page against raw/LLM Wiki.md or revert this commit.
+
+## [2026-09-02] lint | 0 fixed, 0 proposed
+- Updated: [[Overview]]
+- Note: Clean structural pass. Fixed the filing of the previous lint: wanted pages are named in plain text there, so the filing does not count as a wanting page.
