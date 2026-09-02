@@ -53,3 +53,6 @@
 
 ## [2026-09-02] lint | fresh clone acceptance
 - Note: Fresh clone from GitHub with the plugin's own scripts under Python 3.9: lint reports 0 structural findings before restore and only restore and wanted-page informational findings; after fetch --restore the evidence check passes on all 14 pages with 0 suspects and 0 errors.
+
+## [2026-09-02] ingest-failed | raw/Empty Clip.md
+- Note: Batch ingest (--all): the file is empty (0 bytes), nothing to read. Skipped; the batch continued. Kept as the example of the failure path; it stays in the backlog until the owner replaces or deletes it.
