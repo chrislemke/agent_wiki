@@ -19,3 +19,6 @@
 - Created: [[karpathy-llm-wiki README]], [[Andrej Karpathy]], [[Claude Code]]
 - Updated: [[LLM Wiki Pattern]], [[Overview]]
 - Note: disposition: new, update, disputed. Batch mode. Dispute recorded on LLM Wiki Pattern (search tooling). Wanted pages: karpathy-llm-wiki, Agent Skills, Open Knowledge Format, Obsidian.
+
+## [2026-09-02] schema | generic block v1
+- Note: Refreshed to the revised canonical wording (language setting, dispute block format, fidelity field); Overview declares sources: [].

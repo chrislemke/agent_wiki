@@ -6,6 +6,7 @@ created: 2026-09-02
 generated:
   by: agent-wiki/claude-fable-5-1
   at: 2026-09-02
+sources: []
 ---
 
 # Overview
