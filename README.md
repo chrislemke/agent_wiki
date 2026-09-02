@@ -47,6 +47,30 @@ You install this repository; you do not copy it. A new wiki starts with `/agent-
 5. `/agent-wiki:lint` fixes what a script can fix, lists what needs your judgement, and files the open points on the Overview page.
 6. `/agent-wiki:verify <page>` records that you read a page against its sources. Nothing else can set that field.
 
+## How to use it
+
+Open Claude Code in your vault folder. Think of `raw/` as the inbox for source material and `wiki/` as the notebook agent-wiki builds from it. You add a source, Claude turns it into linked pages, and you browse those pages in Obsidian or ask questions about them in Claude Code.
+
+A typical run looks like this:
+
+```
+/agent-wiki:fetch <url>
+/agent-wiki:ingest raw/<file>
+/agent-wiki:query <question>
+```
+
+Replace `<url>`, `<file>` and `<question>` with your own values. You can also put files into `raw/` yourself instead of fetching them. When you ingest a source, Claude first shows what it found and which pages it plans to change. After a query, it asks whether you want to save the answer as a new page; answer `yes` if the result should become part of the wiki.
+
+You do not always need to type the query command. If you ask a question that is clearly about your wiki, Claude can choose the `query` skill automatically. Use `/agent-wiki:query <question>` when you want to make sure Claude searches the wiki; the explicit command is more reliable.
+
+For day-to-day use:
+
+- Add new material with `/agent-wiki:fetch <url>` or by placing files in `raw/`, then ingest it. Use `/agent-wiki:ingest --all` to work through everything waiting in the inbox.
+- Ask questions naturally and let Claude choose the `query` skill, or use `/agent-wiki:query <question>` for the most reliable wiki lookup. File useful answers so the wiki grows with your work.
+- Open the vault in Obsidian whenever you want to browse the linked pages directly.
+- After checking an important page against its sources, record that review with `/agent-wiki:verify <page>`.
+- Run `/agent-wiki:lint` occasionally to repair simple problems and collect anything that needs your judgement.
+
 ## What's in the box
 
 | Kind | Name | What it does |
