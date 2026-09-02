@@ -10,7 +10,7 @@ Entry format:
 Operations: init, fetch, ingest, ingest-failed, query, lint, verify, schema.
 
 Usage:
-  log.py append --op OP --title T [--created P [P ...]] [--updated P [P ...]] [--note N] [--vault V]
+  log.py append --op OP --title T [--created P [P ...]] [--updated P [P ...]] [--note N] [--vault V] [--json]
   log.py parse [--vault V] [--json]
   log.py tail N [--vault V] [--json]
   log.py since-lint [--vault V] [--json]
@@ -129,7 +129,10 @@ def _cmd_append(args: argparse.Namespace) -> int:
     except (V.VaultError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return V.EXIT_USAGE
-    print(entry, end="")
+    if args.json:
+        print(json.dumps({"entry": entry}))
+    else:
+        print(entry, end="")
     return V.EXIT_OK
 
 
@@ -187,6 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--updated", nargs="+", action="extend", default=[], help="page(s) updated; repeatable")
     p.add_argument("--note", default=None)
     p.add_argument("--vault", default=None)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_append)
     p = sub.add_parser("parse")
     p.add_argument("--vault", default=None)

@@ -13,8 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hooklib as H  # noqa: E402
 
-sys.path.insert(0, str(H.PLUGIN_ROOT / "scripts"))
-import lint as LINT  # noqa: E402
+import lint as LINT  # noqa: E402  (hooklib put scripts/ on sys.path)
 import log as LOG  # noqa: E402
 import vault as V  # noqa: E402
 

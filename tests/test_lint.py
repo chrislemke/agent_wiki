@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -58,10 +59,6 @@ def test_each_checker_reports_its_defect(tmp_path: Path):
     code, data = findings(vault)
     assert code == 1
     judgement = types(data["judgement"])
-    for expected in {
-        "near-miss-link",  # not unique? it is unique -> should be fixable, checked below
-    } - judgement:
-        pass
     assert "near-miss-link" in types(data["fixable"])
     assert "index-drift" in types(data["fixable"])
     assert "frontmatter-order" in types(data["fixable"])
@@ -71,7 +68,6 @@ def test_each_checker_reports_its_defect(tmp_path: Path):
     assert wanted["target"] == "Progressive Disclosure" and wanted["count"] == 2
     assert sorted(p.split("/")[-1] for p in wanted["pages"]) == ["Orphan.md", "Typo Page.md"]
     orphan = by_type(data, "orphan")
-    assert {o["page"].split("/")[-1] for o in orphan} == {"Orphan.md", "Wikilinks Dup.md", "Unordered.md", "log.md"} - {"log.md"} or True
     assert any(o["page"].endswith("Orphan.md") for o in orphan)
     assert not any(o["page"].endswith("Overview.md") for o in orphan)
     stale = by_type(data, "stale")[0]
@@ -112,9 +108,9 @@ def test_created_is_added_from_git_history_and_git_freshness_is_reported(tmp_pat
     (vault / "wiki/entities/NoCreated.md").write_text("---\ntype: entity\ntitle: NoCreated\ndescription: d\ngenerated: { by: x, at: 2026-01-01 }\n---\n\n# NoCreated\nSee [[Overview]].\n", encoding="utf-8")
     env = {"GIT_AUTHOR_DATE": "2026-03-04T10:00:00", "GIT_COMMITTER_DATE": "2026-03-04T10:00:00"}
     subprocess.run(["git", "init", "-q"], cwd=vault, check=True)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"], cwd=vault, check=True, env={**__import__('os').environ, **env})
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"], cwd=vault, check=True, env={**os.environ, **env})
     subprocess.run(["git", "add", "-A"], cwd=vault, check=True)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "add"], cwd=vault, check=True, env={**__import__('os').environ, **env})
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "add"], cwd=vault, check=True, env={**os.environ, **env})
     code, data = findings(vault, "--fix")
     created = by_type(data, "created-missing")
     assert created and created[0]["severity"] == "auto-fixed"
@@ -192,3 +188,23 @@ def test_restore_findings_are_reported_once_per_source_page(tmp_path: Path):
     restore = by_type(data, "restore")
     assert len(restore) == 1 and restore[0]["page"].endswith("Note Taking Guide.md")
     assert "evidence-suspect" not in types(data["judgement"])
+
+
+def test_remaining_finding_types_have_a_defect_case(tmp_path: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    # duplicate-basename: same basename in two type folders
+    (vault / "wiki/analyses/Obsidian.md").write_text(page("analysis", "Obsidian", question="Q?", body="See [[Overview]]."), encoding="utf-8")
+    # frontmatter-invalid: unparseable yaml
+    (vault / "wiki/concepts/Broken.md").write_text("---\ntype: concept\nnested:\n  a:\n    b: c\n---\n# Broken\nSee [[Overview]].\n", encoding="utf-8")
+    # evidence-error: source entry pointing at a page that does not exist
+    (vault / "wiki/entities/Dangling.md").write_text(page("entity", "Dangling", body="Says 12,345 things. See [[Overview]].").replace("---\n\n# ", 'sources:\n  - id: ghost\n    page: "[[Ghost Source]]"\n---\n\n# ', 1), encoding="utf-8")
+    # generic-block-edited: same version, different content
+    claude = vault / "CLAUDE.md"
+    claude.write_text(claude.read_text(encoding="utf-8").replace("### Truth", "### Truth (edited locally)"), encoding="utf-8")
+    code, data = findings(vault)
+    assert code == 1
+    assert {"duplicate-basename", "frontmatter-invalid", "evidence-error", "generic-block-edited"} <= types(data["judgement"])
+    # generic-block-missing
+    claude.write_text("# No block here\n", encoding="utf-8")
+    code, data = findings(vault)
+    assert "generic-block-missing" in types(data["judgement"])

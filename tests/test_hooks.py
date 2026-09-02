@@ -286,3 +286,42 @@ def test_stop_does_not_treat_a_new_source_page_as_orphan(tmp_path: Path, state_d
     run_script("log.py", "append", "--op", "ingest", "--title", "Thin Source", "--vault", str(vault))
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.code == 0 and r.out.strip() == "", r
+
+
+def test_allowlisted_script_does_not_launder_a_chained_raw_write(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, f"python3 {PLUGIN}/scripts/verify.py wiki/entities/Obsidian.md --by chris; rm 'raw/Note Taking Guide.md'"), env=env_for(state_dir))
+    assert decision(r) == "deny", r
+    r = run_hook("pre_tool_use.py", bash_event(vault, f"python3 {PLUGIN}/scripts/fetch.py url https://example.com --json && git add -A -- . && git commit -m 'fetch: x'"), env=env_for(state_dir))
+    assert decision(r) == "allow", r
+
+
+@pytest.mark.parametrize("command", [
+    "rm -rf raw",
+    "rm -rf ./raw",
+    "mv raw raw_old",
+    "cd raw && rm x.md",
+    "cd raw; sed -i '' s/a/b/ x.md",
+    "git checkout -- 'raw/Note Taking Guide.md'",
+    "git restore raw/x.md",
+    "git clean -fd raw",
+])
+def test_whole_layer_and_git_writes_into_raw_are_denied(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "deny", (command, r)
+
+
+@pytest.mark.parametrize("command", [
+    "ls raw",
+    "cd raw && ls",
+    "cd raw && cat x.md | head",
+    "git status -- raw",
+    "git log -- raw/x.md",
+    "python3 scripts/rawhash.py hash raw/x.md",
+    "echo raw > /tmp/note.txt",
+])
+def test_reads_of_the_raw_layer_stay_allowed(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "allow", (command, r)

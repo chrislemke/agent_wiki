@@ -13,7 +13,7 @@ Checkers: frontmatter, index, links, wanted, stale, review, footnotes, duplicate
 orphans, tags, rawhash, backlog, generic-block, git, reserved, evidence.
 
 Finding: {type, severity, page, detail, action, ...}. Severity is one of
-auto-fixed, fixable, judgement, informational.
+auto-fixed, fixable, judgement, informational (fixable is what --fix would change).
 Exit codes: 0 clean, 1 judgement or fixable findings remain, 2 usage.
 """
 from __future__ import annotations
@@ -94,9 +94,6 @@ class Context:
         except ValueError:
             return False
 
-    def refresh(self) -> None:
-        self.__init__(self.root, self.scope, self.fix)
-
 
 # ----------------------------------------------------------------------------- checkers
 
@@ -157,8 +154,7 @@ def check_index(ctx: Context) -> List[Finding]:
 
 def _rewrite_link(page: Path, old: str, new: str) -> None:
     text = page.read_text(encoding="utf-8")
-    pattern = re.compile(r"(!?\[\[)" + re.escape(old) + r"(?=[\]|#])")
-    page.write_text(pattern.sub(lambda m: m.group(1) + new, text), encoding="utf-8")
+    page.write_text(L.link_pattern(old).sub(lambda m: m.group(1) + new, text), encoding="utf-8")
 
 
 def check_links(ctx: Context) -> List[Finding]:
@@ -327,7 +323,7 @@ def check_rawhash(ctx: Context) -> List[Finding]:
         if rec["status"] == "mismatch":
             out.append(finding("raw-hash-mismatch", "judgement", rec["page"], f"raw file changed since ingest: {rec['raw']}", "re-ingest the source (ingest asks first) or restore the original raw file", raw=rec["raw"]))
         elif rec["status"] == "missing":
-            key = rec["raw"].split("/", 1)[1] if rec["raw"].startswith("raw/") else rec["raw"]
+            key = EV.restorable_key(rec["raw"])
             if key in restorable:
                 out.append(finding("restore", "informational", rec["page"], f"raw file listed in SOURCES.md but missing locally: {rec['raw']}", "run fetch --restore", raw=rec["raw"], url=restorable[key]["url"]))
             else:
@@ -462,10 +458,9 @@ def run_all(root: Path, scope: Optional[Path], fix: bool) -> Dict[str, Any]:
         fresh = Context(root, scope, fix) if (fix and name in ("links", "index")) else ctx
         all_findings.extend(CHECKERS[name](fresh))
     all_findings = dedupe(all_findings)
-    groups = {"auto_fixed": [], "fixable": [], "judgement": [], "informational": []}
-    key_map = {"auto-fixed": "auto_fixed", "fixable": "fixable", "judgement": "judgement", "informational": "informational"}
+    groups: Dict[str, List[Finding]] = {"auto_fixed": [], "fixable": [], "judgement": [], "informational": []}
     for f in all_findings:
-        groups[key_map[f["severity"]]].append(f)
+        groups[f["severity"].replace("-", "_")].append(f)
     summary = {k: len(v) for k, v in groups.items()}
     summary["clean"] = not groups["judgement"] and not groups["fixable"]
     return {**groups, "summary": summary, "scope": V.rel(root, scope) if scope else None}

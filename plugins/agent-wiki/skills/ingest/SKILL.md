@@ -51,4 +51,4 @@ Read one source fully, decide what it changes, write the pages in a fixed order,
 
 11. **Report.** For one source: pages created and updated, disputes recorded, wanted pages left behind. For a batch: one line per source with its disposition, then the failures.
 
-Never compile two sources at the same time, and never dispatch subagents to compile in parallel: index, log and cascade updates are shared state.
+Never compile two sources at the same time, and never dispatch subagents to compile in parallel: index, log and cascade updates are shared state. When `confidential` is `"true"`, nothing from the source or the wiki is sent to a web search or published; refuse such a request in one line.

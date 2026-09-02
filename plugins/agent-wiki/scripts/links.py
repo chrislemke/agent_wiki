@@ -9,7 +9,6 @@ duplicate basenames across the wiki.
 Usage:
   links.py resolve PAGE|VAULT [--json]
   links.py inbound TARGET --vault V [--json]
-  links.py extract PAGE [--json]
 
 Exit codes: 0 clean, 1 findings (near-miss, duplicates, or unresolved), 2 usage.
 """
@@ -29,6 +28,17 @@ import vault as V  # noqa: E402
 LINK_RE = re.compile(r"(!?)\[\[([^\[\]]+?)\]\]")
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def link_pattern(target: str) -> "re.Pattern[str]":
+    """Match [[target, [[target|alias, [[target#heading and ![[target embeds, up to the closing part."""
+    return re.compile(r"(!?\[\[)" + re.escape(target) + r"(?=[\]|#])")
+
+
+def wikilink_target(value: str) -> str:
+    """The page name inside a [[wikilink]] value (alias and heading stripped), or the value itself."""
+    m = re.match(r"^\[\[([^\]|#]+)", value.strip())
+    return m.group(1).strip() if m else value.strip()
 
 
 def strip_code(text: str) -> str:
@@ -194,10 +204,8 @@ def source_links(text: str) -> List[str]:
         return []
     out: List[str] = []
     for entry in FM.as_list((data or {}).get("sources")):
-        if isinstance(entry, dict):
-            m = re.match(r"^\[\[([^\]|#]+)", str(entry.get("page", "")).strip())
-            if m:
-                out.append(m.group(1).strip())
+        if isinstance(entry, dict) and str(entry.get("page", "")).strip():
+            out.append(wikilink_target(str(entry.get("page", ""))))
     return out
 
 
@@ -227,19 +235,9 @@ def inbound_links(root: Path, target: str, catalog: Optional[Catalog] = None) ->
     return hits
 
 
-def _pages_for(target: str) -> Tuple[Path, List[Path]]:
-    path = Path(target)
-    root = V.require_vault(str(path))
-    if path.is_file():
-        return root, [path]
-    if path.resolve() == root.resolve():
-        return root, list(V.iter_pages(root))
-    return root, list(V.iter_pages(root, path))
-
-
 def _cmd_resolve(args: argparse.Namespace) -> int:
     try:
-        root, pages = _pages_for(args.target)
+        root, pages = V.pages_for(args.target)
     except V.VaultError as exc:
         print(str(exc), file=sys.stderr)
         return V.EXIT_USAGE
@@ -275,17 +273,6 @@ def _cmd_inbound(args: argparse.Namespace) -> int:
     return V.EXIT_OK
 
 
-def _cmd_extract(args: argparse.Namespace) -> int:
-    path = Path(args.page)
-    links = extract_links(path.read_text(encoding="utf-8"))
-    if args.json:
-        print(json.dumps(links, indent=2, ensure_ascii=False))
-    else:
-        for l in links:
-            print(l["target"])
-    return V.EXIT_OK
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="links.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -298,10 +285,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vault", default=None)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_inbound)
-    p = sub.add_parser("extract")
-    p.add_argument("page")
-    p.add_argument("--json", action="store_true")
-    p.set_defaults(func=_cmd_extract)
     return parser
 
 

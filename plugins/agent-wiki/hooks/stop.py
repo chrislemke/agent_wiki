@@ -16,8 +16,7 @@ from typing import List
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hooklib as H  # noqa: E402
 
-sys.path.insert(0, str(H.PLUGIN_ROOT / "scripts"))
-import frontmatter as FM  # noqa: E402
+import frontmatter as FM  # noqa: E402  (hooklib put scripts/ on sys.path)
 import links as L  # noqa: E402
 
 
@@ -29,12 +28,11 @@ def main() -> int:
     if root is None:
         return 0
     session_id = str(event.get("session_id") or "default")
-    state_path = H._state_path(session_id)
-    if not state_path.is_file():
+    if not H.state_path(session_id).is_file():
         return 0
     state = H.SessionState(session_id, root)
     problems: List[str] = []
-    touched = [t for t in state.data.get("touched", []) if (root / t).is_file() or t in state.data.get("created", [])]
+    touched = [t for t in state.touched if (root / t).is_file() or t in state.created]
     if touched and not state.log_changed():
         problems.append(
             "wiki pages changed this session but log.md has no new entry: "
@@ -44,7 +42,7 @@ def main() -> int:
         )
     catalog = L.Catalog(root)
     orphans = []
-    for rel in state.data.get("created", []):
+    for rel in state.created:
         page = root / rel
         if not page.is_file():
             continue
@@ -64,9 +62,9 @@ def main() -> int:
     if not problems:
         return 0
     signature = json.dumps(problems, sort_keys=True)
-    if state.data.get("last_block_signature") == signature:
+    if state.already_blocked_for(signature):
         return 0
-    state.data["last_block_signature"] = signature
+    state.remember_block(signature)
     state.save()
     H.block_stop("agent-wiki: " + " | ".join(problems))
     return 0

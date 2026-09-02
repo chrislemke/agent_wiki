@@ -10,10 +10,10 @@ Anything else is reported as unparseable, never guessed at.
 
 Usage:
   frontmatter.py parse PAGE [--json]
-  frontmatter.py normalize PAGE...             Rewrite frontmatter in canonical key order
+  frontmatter.py normalize PAGE... [--json]    Rewrite frontmatter in canonical key order
   frontmatter.py validate PAGE|VAULT [--json]  Required fields per type, enums, ISO dates
-  frontmatter.py stamp PAGE --by ACTOR [--vault V]   Sets generated, created and stale_after (and ingested on source pages)
-  frontmatter.py set PAGE KEY VALUE            Set a scalar key (never verified)
+  frontmatter.py stamp PAGE --by ACTOR [--vault V] [--json]   Sets generated, created, stale_after (and ingested on source pages)
+  frontmatter.py set PAGE KEY VALUE [--json]   Set a scalar key (never verified)
 
 Exit codes: 0 clean, 1 findings or errors, 2 usage. Python 3 stdlib only.
 """
@@ -534,6 +534,7 @@ def _cmd_parse(args: argparse.Namespace) -> int:
 
 def _cmd_normalize(args: argparse.Namespace) -> int:
     code = V.EXIT_OK
+    changed: List[str] = []
     for page in args.pages:
         path = Path(page)
         try:
@@ -549,18 +550,20 @@ def _cmd_normalize(args: argparse.Namespace) -> int:
         new_text = render(data, body)
         if new_text != path.read_text(encoding="utf-8"):
             path.write_text(new_text, encoding="utf-8")
-            print(f"normalized {path}")
+            changed.append(str(path))
+            if not args.json:
+                print(f"normalized {path}")
+    if args.json:
+        print(json.dumps({"normalized": changed}))
     return code
 
 
 def _collect_pages(target: str) -> Tuple[Optional[Path], List[Path]]:
-    path = Path(target)
-    root = V.find_vault(path)
-    if path.is_file():
-        return root, [path]
-    if root is not None and path.resolve() == root.resolve():
-        return root, list(V.iter_pages(root))
-    return root, list(V.iter_pages(root or path, path))
+    try:
+        return V.pages_for(target)
+    except V.VaultError:
+        path = Path(target)
+        return None, [path] if path.is_file() else list(V.iter_pages(path, path))
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
@@ -593,7 +596,10 @@ def _cmd_stamp(args: argparse.Namespace) -> int:
     except FrontmatterError as exc:
         print(f"{path}: {exc}", file=sys.stderr)
         return V.EXIT_FINDINGS
-    print(f"stamped {path}: generated.at={data['generated']['at']} stale_after={data.get('stale_after', '-')}")
+    if args.json:
+        print(json.dumps({"page": str(path), "generated": data["generated"], "created": data.get("created"), "stale_after": data.get("stale_after"), "ingested": data.get("ingested")}))
+    else:
+        print(f"stamped {path}: generated.at={data['generated']['at']} stale_after={data.get('stale_after', '-')}")
     return V.EXIT_OK
 
 
@@ -615,7 +621,7 @@ def _cmd_set(args: argparse.Namespace) -> int:
         value = parse_scalar(value)
     data[args.key] = value
     write_page(path, data, body)
-    print(f"set {args.key} on {path}")
+    print(json.dumps({"page": str(path), args.key: value}) if args.json else f"set {args.key} on {path}")
     return V.EXIT_OK
 
 
@@ -628,6 +634,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_cmd_parse)
     p = sub.add_parser("normalize")
     p.add_argument("pages", nargs="+")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_normalize)
     p = sub.add_parser("validate")
     p.add_argument("target")
@@ -637,11 +644,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("page")
     p.add_argument("--by", required=True, help="actor, e.g. agent-wiki/<model-id>")
     p.add_argument("--vault", default=None)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_stamp)
     p = sub.add_parser("set")
     p.add_argument("page")
     p.add_argument("key")
     p.add_argument("value")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_set)
     return parser
 

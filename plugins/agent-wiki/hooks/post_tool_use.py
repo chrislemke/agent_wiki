@@ -15,8 +15,7 @@ from typing import List
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hooklib as H  # noqa: E402
 
-sys.path.insert(0, str(H.PLUGIN_ROOT / "scripts"))
-import frontmatter as FM  # noqa: E402
+import frontmatter as FM  # noqa: E402  (hooklib put scripts/ on sys.path)
 import links as L  # noqa: E402
 import vault as V  # noqa: E402
 
@@ -34,7 +33,7 @@ def main() -> int:
     session_id = str(event.get("session_id") or "default")
     state = H.SessionState(session_id, root)
     rel = V.rel(root, path)
-    before = list(state.data["headings"].get(rel, []))
+    before = state.headings_before(rel)
     state.note_post_write(path)
     state.save()
 

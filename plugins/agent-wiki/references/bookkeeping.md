@@ -6,7 +6,7 @@ All scripts live in `${CLAUDE_PLUGIN_ROOT}/scripts/` and run with `python3`. `${
 
 | Task | Command |
 |---|---|
-| Find the vault | `vault.py detect [PATH] [--json]` (prints the root; `root` in JSON) |
+| Find the vault | `vault.py detect [PATH] [--json]` (prints the root; `root` in JSON; exit 1 when no vault encloses the path) |
 | Read the domain settings | `vault.py settings [--vault V] --json` (booleans are the strings `"true"`/`"false"`) |
 | Stamp a page after writing it | `frontmatter.py stamp <page> --by agent-wiki/<model-id> [--vault V]` (sets `generated`, `created` and `stale_after`; `ingested` on source pages) |
 | Validate frontmatter | `frontmatter.py validate <page or vault> [--json]` |
@@ -46,7 +46,7 @@ One source at a time. Never compile two sources in parallel: index, log and casc
 
 ## Log and commit
 
-Log header `## [YYYY-MM-DD] <op> | <title>`, then `- Created:`, `- Updated:`, `- Note:` lines as needed. Operations: `init`, `fetch`, `ingest`, `ingest-failed`, `query`, `lint`, `verify`, `schema`. Titles: the source title for ingest; for fetch the source title, `<repo> README[ and <files>]` for a repository, or `restore: <N> files`; the question for query; `<N> fixed, <M> proposed` for lint; the page title for verify; `generic block v<N>` for schema.
+Log header `## [YYYY-MM-DD] <op> | <title>`, then `- Created:`, `- Updated:`, `- Note:` lines as needed. Operations: `init`, `fetch`, `ingest`, `ingest-failed`, `query`, `lint`, `verify`, `schema`. Titles: the source title for ingest; for fetch the source title, `<repo> README[ and <files>]` for a repository, or `restore: <N> sources`; the question for query; `<N> fixed, <M> proposed` for lint (a check-only run may use a short description such as `fresh clone acceptance`); the page title for verify; `generic block v<N>` for schema.
 
 The commit message is `<op>: <title>`, the same words as the log header, no body needed, no attribution trailer. Every operation ends with both, an unfiled query included (its commit holds only the log entry). Run git against the vault root reported by `vault.py detect`, whatever the working directory:
 
@@ -58,4 +58,4 @@ When the vault sits inside a larger repository, the commit lands in the enclosin
 
 ## Confidentiality
 
-Read `vault.py settings --json` before any outward action. `confidential: "true"` forbids web search and publishing (Artifacts, gists, anything that leaves the machine) and is explained in one line when it blocks something. `web_search: "false"` forbids web search alone. Fetching a URL the owner gave is always allowed.
+Every skill reads `vault.py settings --json` before any outward action. `confidential: "true"` forbids web search and publishing (Artifacts, gists, anything that leaves the machine) and is explained in one line when it blocks something. `web_search: "false"` forbids web search alone. Fetching a URL the owner gave is always allowed.

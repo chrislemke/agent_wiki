@@ -41,4 +41,4 @@ Answer `$ARGUMENTS` from the wiki, cite pages, say how much of it is human-revie
    git -C <root> add -A -- . && git -C <root> commit -m "query: <question>"
    ```
 
-Answers are markdown in the conversation. Slides, charts or other formats are a domain decision and belong in the domain block when a vault wants them.
+Answers are markdown in the conversation. Slides, charts or other formats are a domain decision and belong in the domain block when a vault wants them. When `confidential` is `"true"`, publishing an answer anywhere outside the machine (an Artifact, a gist, a shared page) is refused in one line.

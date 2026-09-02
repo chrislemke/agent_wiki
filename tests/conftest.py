@@ -5,6 +5,7 @@ Nothing imports script internals.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import shutil
@@ -20,7 +21,7 @@ SCRIPTS = PLUGIN / "scripts"
 HOOKS = PLUGIN / "hooks"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
-TODAY = __import__("datetime").date.today().isoformat()
+TODAY = datetime.date.today().isoformat()
 
 # The scripts and hooks are run the way Claude Code runs them: with the system `python3`,
 # which is the compatibility floor (3.9). AGENT_WIKI_TEST_PYTHON overrides the interpreter.

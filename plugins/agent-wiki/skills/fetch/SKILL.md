@@ -15,6 +15,7 @@ Put a verbatim copy of a web resource into `raw/`, the immutable source layer, w
 2. **Route `$ARGUMENTS`.**
    - `--restore` → step 5.
    - A GitHub *repository* URL (`github.com/<owner>/<repo>`, optionally `/tree/<branch>/<path>`) → step 4.
+   - `--crawl` is reserved for a later version: refuse in one line ("crawl mode is not built yet; fetch the pages one by one").
    - Anything else, including `github.com/.../blob/...` file URLs and gists → step 3. When unsure, `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.py plan-url <URL>` shows whether the URL is downloaded as a file or extracted as an article.
 
 3. **Article or file.** Run `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.py url <URL> --json`. Markdown files, gists and GitHub blobs are downloaded verbatim; other pages are extracted with `uvx trafilatura`. The raw file `raw/<Title>.md` carries `title`, `resource`, `fetched`, `author`, `published`, `fidelity: verbatim`. If the script fails (paywall, script-rendered page, non-HTML), fall back: WebFetch the URL with the prompt "Return the complete article text as markdown, verbatim, keeping headings, lists and quotes. No summary, no commentary." and pipe the result in:
@@ -37,7 +38,7 @@ Put a verbatim copy of a web resource into `raw/`, the immutable source layer, w
 
 5. **Restore.** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/fetch.py restore --json` downloads every row of `raw/SOURCES.md` whose file is missing and skips the rest. Done when the script reports `restored`, `skipped` and `failed`.
 
-6. **Log and commit.** One entry and one commit per fetch. Titles: the source title for an article; `<repo> README` or `<repo> README and <files>` for a repository; `restore: <N> files` for a restore.
+6. **Log and commit.** One entry and one commit per fetch. Titles: the source title for an article; `<repo> README` or `<repo> README and <files>` for a repository; `restore: <N> sources` for a restore.
 
    ```
    python3 ${CLAUDE_PLUGIN_ROOT}/scripts/log.py append --op fetch --title "<title>" --note "<resource>; fidelity <verbatim|summary>"

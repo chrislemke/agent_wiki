@@ -17,7 +17,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 MARKER = ".agent-wiki.json"
 SCHEMA_VERSION = 1
@@ -200,11 +200,15 @@ def truthy(value: object) -> bool:
     return str(value).strip().lower() in {"true", "yes", "1", "on", "allowed"}
 
 
-def emit(data: object, as_json: bool, text: str = "") -> None:
-    if as_json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    elif text:
-        print(text)
+def pages_for(target: str) -> Tuple[Path, List[Path]]:
+    """Resolve a page, a folder or a vault root to (vault root, pages to work on)."""
+    path = Path(target)
+    root = require_vault(str(path))
+    if path.is_file():
+        return root, [path]
+    if path.resolve() == root.resolve():
+        return root, list(iter_pages(root))
+    return root, list(iter_pages(root, path))
 
 
 def _cmd_detect(args: argparse.Namespace) -> int:
@@ -220,7 +224,10 @@ def _cmd_detect(args: argparse.Namespace) -> int:
         "plugin_version": marker.get("plugin_version"),
         "created": marker.get("created"),
     }
-    emit(data, args.json, str(root))
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(str(root))
     return EXIT_OK
 
 

@@ -72,54 +72,54 @@ def load_answers(path: Path) -> Dict[str, Any]:
     return data
 
 
-def settings_yaml(a: Dict[str, Any]) -> str:
+def settings_yaml(answers: Dict[str, Any]) -> str:
     def yes_no(v: Any) -> str:
         return "true" if V.truthy(v) or v is True else "false"
 
     mapping: Dict[str, Any] = {
-        "language": str(a.get("language", "en")),
-        "image_cap": str(a.get("image_cap", 5)),
-        "human_id": str(a.get("human_id", "owner")),
-        "confidential": yes_no(a.get("confidential", False)),
-        "web_search": yes_no(a.get("web_search", True)),
-        "tags": [str(t) for t in a.get("tags", [])],
-        "staleness": {str(k): str(v) for k, v in dict(a.get("staleness") or {}).items()},
-        "extra_types": [str(t) for t in a.get("extra_types", [])],
+        "language": str(answers.get("language", "en")),
+        "image_cap": str(answers.get("image_cap", 5)),
+        "human_id": str(answers.get("human_id", "owner")),
+        "confidential": yes_no(answers.get("confidential", False)),
+        "web_search": yes_no(answers.get("web_search", True)),
+        "tags": [str(t) for t in answers.get("tags", [])],
+        "staleness": {str(k): str(v) for k, v in dict(answers.get("staleness") or {}).items()},
+        "extra_types": [str(t) for t in answers.get("extra_types", [])],
     }
     return "\n".join(FM.serialize_mapping(mapping))
 
 
-def render_domain_block(a: Dict[str, Any]) -> str:
+def render_domain_block(answers: Dict[str, Any]) -> str:
     template = DOMAIN_TEMPLATE.read_text(encoding="utf-8")
     fields = {
-        "purpose": str(a.get("purpose", "")).strip(),
-        "entities": str(a.get("entities", "")).strip(),
-        "sources": str(a.get("sources", "")).strip(),
-        "lens": str(a.get("lens", "")).strip(),
-        "settings": settings_yaml(a),
+        "purpose": str(answers.get("purpose", "")).strip(),
+        "entities": str(answers.get("entities", "")).strip(),
+        "sources": str(answers.get("sources", "")).strip(),
+        "lens": str(answers.get("lens", "")).strip(),
+        "settings": settings_yaml(answers),
     }
     for key, value in fields.items():
         template = template.replace("{{" + key + "}}", value or "(not stated)")
     return template.strip() + "\n"
 
 
-def render_claude_md(a: Dict[str, Any]) -> str:
+def render_claude_md(answers: Dict[str, Any]) -> str:
     generic = GENERIC.read_text(encoding="utf-8").strip()
     return (
-        f"# {a['title']}\n\n"
+        f"# {answers['title']}\n\n"
         "This folder is an agent-wiki vault: `raw/` holds sources, `wiki/` holds the pages the LLM maintains, "
         "and this file is the schema. Skills: `/agent-wiki:fetch`, `/agent-wiki:ingest`, `/agent-wiki:query`, "
         "`/agent-wiki:lint`, `/agent-wiki:verify` (install: `/plugin marketplace add " + MARKETPLACE_REPO + "`, then `/plugin install agent-wiki@agent-wiki`).\n\n"
-        + generic + "\n\n" + render_domain_block(a)
+        + generic + "\n\n" + render_domain_block(answers)
     )
 
 
-def overview_page(a: Dict[str, Any], actor: str) -> str:
+def overview_page(answers: Dict[str, Any], actor: str) -> str:
     today = V.today()
     data: Dict[str, Any] = {
         "type": "synthesis",
         "title": "Overview",
-        "description": f"Hub page of {a['title']}: what this wiki covers and what is still open.",
+        "description": f"Hub page of {answers['title']}: what this wiki covers and what is still open.",
         "created": today,
         "generated": {"by": actor, "at": today},
         "sources": [],
@@ -127,7 +127,7 @@ def overview_page(a: Dict[str, Any], actor: str) -> str:
     body = (
         "\n# Overview\n\n"
         "## Thesis\n"
-        f"{str(a.get('purpose', '')).strip() or 'What this wiki is about.'}\n\n"
+        f"{str(answers.get('purpose', '')).strip() or 'What this wiki is about.'}\n\n"
         "## Evidence\n- No sources ingested yet.\n\n"
         "## Open questions\n- Which sources to ingest first?\n"
     )
@@ -148,7 +148,7 @@ def enclosing_git_repo(target: Path) -> Optional[str]:
     return str(top) if top != target.resolve() else None
 
 
-def scaffold(target: Path, a: Dict[str, Any], actor: str) -> Dict[str, Any]:
+def scaffold(target: Path, answers: Dict[str, Any], actor: str) -> Dict[str, Any]:
     created: List[str] = []
     skipped: List[str] = []
     warnings: List[str] = []
@@ -165,7 +165,7 @@ def scaffold(target: Path, a: Dict[str, Any], actor: str) -> Dict[str, Any]:
     target.mkdir(parents=True, exist_ok=True)
     today = V.today()
     write(V.MARKER, json.dumps({"schema_version": V.SCHEMA_VERSION, "plugin_version": V.PLUGIN_VERSION, "created": today}, indent=2) + "\n")
-    write("CLAUDE.md", render_claude_md(a))
+    write("CLAUDE.md", render_claude_md(answers))
     if "CLAUDE.md" in skipped:
         text = (target / "CLAUDE.md").read_text(encoding="utf-8")
         if not V.GENERIC_OPEN_RE.search(text):
@@ -177,12 +177,12 @@ def scaffold(target: Path, a: Dict[str, Any], actor: str) -> Dict[str, Any]:
         if folder != "wiki/syntheses" and not any((target / folder).iterdir()):
             write(f"{folder}/.gitkeep", "")
     write("raw/SOURCES.md", SOURCES_MD)
-    write("wiki/syntheses/Overview.md", overview_page(a, actor))
+    write("wiki/syntheses/Overview.md", overview_page(answers, actor))
     write("index.md", "# Index\n\n<!-- agent-wiki:curated -->\n## Start here\n- [[Overview]] is the hub. Ask questions with `/agent-wiki:query`.\n<!-- /agent-wiki:curated -->\n")
     if not (target / "log.md").exists():
         (target / "log.md").write_text("# Log\n", encoding="utf-8")
         created.append("log.md")
-        LOG.append(target, "init", str(a["title"]), ["Overview"], [], "Vault scaffolded by agent-wiki init.")
+        LOG.append(target, "init", str(answers["title"]), ["Overview"], [], "Vault scaffolded by agent-wiki init.")
     else:
         skipped.append("log.md")
     write(".gitignore", GITIGNORE)

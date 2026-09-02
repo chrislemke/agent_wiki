@@ -19,8 +19,7 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hooklib as H  # noqa: E402
 
-sys.path.insert(0, str(H.PLUGIN_ROOT / "scripts"))
-import frontmatter as FM  # noqa: E402
+import frontmatter as FM  # noqa: E402  (hooklib put scripts/ on sys.path)
 import vault as V  # noqa: E402
 
 FILE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
@@ -30,21 +29,23 @@ PATTERNS = Path(__file__).resolve().parent / "bash_patterns.json"
 def projected_content(event: Dict[str, Any], current: Optional[str]) -> Optional[str]:
     """What the file will contain after the tool runs, or None when unknown."""
     tool = event.get("tool_name")
-    ti = event.get("tool_input") or {}
+    tool_input = event.get("tool_input") or {}
+    # Claude Code names the fields content / old_string / new_string; the alternate spellings
+    # appear in some published examples and cost nothing to accept.
     if tool == "Write":
-        content = ti.get("content", ti.get("file_contents"))
+        content = tool_input.get("content", tool_input.get("file_contents"))
         return str(content) if content is not None else None
     if current is None:
         return None
     if tool == "Edit":
-        old = str(ti.get("old_string", ti.get("old_str", "")))
-        new = str(ti.get("new_string", ti.get("new_str", "")))
+        old = str(tool_input.get("old_string", tool_input.get("old_str", "")))
+        new = str(tool_input.get("new_string", tool_input.get("new_str", "")))
         if old == "":
             return current
-        return current.replace(old, new) if ti.get("replace_all") else current.replace(old, new, 1)
+        return current.replace(old, new) if tool_input.get("replace_all") else current.replace(old, new, 1)
     if tool == "MultiEdit":
         text = current
-        for edit in ti.get("edits") or []:
+        for edit in tool_input.get("edits") or []:
             old = str(edit.get("old_string", ""))
             new = str(edit.get("new_string", ""))
             if old:
@@ -117,22 +118,33 @@ def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+SEGMENT_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||;|\||\n)\s*")
+
+
 def guard_bash(root: Path, command: str) -> Optional[str]:
+    """Deny write-like operations on raw/. Each pipeline segment is judged on its own, so an
+    allowlisted plugin script never launders a chained command."""
     cfg = json.loads(PATTERNS.read_text(encoding="utf-8"))
-    for rule in cfg.get("allow", []):
-        if re.search(rule["pattern"], command):
-            return None
     raw_target = cfg["raw_target"]
-    # raw/SOURCES.md is the list of restorable sources, not a source: a command whose only
-    # raw/ mentions are that file passes.
-    mentions = re.findall(r"raw/[^\s\"'|;&)]*", command)
-    if mentions and all(m.endswith(V.SOURCES_LIST) for m in mentions):
-        return None
-    for rule in cfg.get("deny", []):
-        pattern = rule["pattern"].replace("RAW", raw_target)
-        if re.search(pattern, command):
-            return (f"{rule['name']} targeting raw/ is blocked: raw/ is the immutable source layer. "
-                    "Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner.")
+    cd_into_raw = re.compile(cfg["cd_into_raw"].replace("RAW", raw_target))
+    inside_raw = False  # a previous segment changed into raw/: every write there counts
+    for segment in SEGMENT_SPLIT_RE.split(command):
+        if not segment.strip():
+            continue
+        if any(re.search(rule["pattern"], segment) for rule in cfg.get("allow", [])):
+            continue
+        # raw/SOURCES.md is the list of restorable sources, not a source: a segment whose only
+        # raw/ mentions are that file passes.
+        mentions = re.findall(r"raw/[^\s\"'|;&)]*", segment)
+        if mentions and all(m.endswith(V.SOURCES_LIST) for m in mentions):
+            continue
+        target = "" if inside_raw else raw_target
+        for rule in cfg.get("deny", []):
+            if re.search(rule["pattern"].replace("RAW", target), segment):
+                return (f"{rule['name']} targeting raw/ is blocked: raw/ is the immutable source layer. "
+                        "Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner.")
+        if cd_into_raw.search(segment):
+            inside_raw = True
     return None
 
 

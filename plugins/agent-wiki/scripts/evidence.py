@@ -202,9 +202,9 @@ def restorable_sources(root: Path) -> Dict[str, Dict[str, str]]:
     return out
 
 
-def _wikilink_target(value: str) -> str:
-    m = re.match(r"^\[\[([^\]|#]+)", value.strip())
-    return m.group(1).strip() if m else value.strip()
+def restorable_key(raw_rel: str) -> str:
+    """The File column of raw/SOURCES.md for a raw path such as raw/X.md."""
+    return raw_rel.split("/", 1)[1] if raw_rel.startswith(V.RAW + "/") else raw_rel
 
 
 def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
@@ -223,7 +223,7 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         if not isinstance(entry, dict):
             continue
         sid = str(entry.get("id", ""))
-        target = _wikilink_target(str(entry.get("page", "")))
+        target = L.wikilink_target(str(entry.get("page", "")))
         source_page = catalog.resolve(target)
         if source_page is None:
             result["errors"].append({"page": result["page"], "detail": f"source page not found: [[{target}]] (id {sid})"})
@@ -238,7 +238,7 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
             continue
         raw_path = root / raw_rel
         if not raw_path.is_file():
-            file_key = raw_rel.split("/", 1)[1] if raw_rel.startswith("raw/") else raw_rel
+            file_key = restorable_key(raw_rel)
             if file_key in restorable:
                 unavailable.add(sid)
                 result["restore"].append({"page": result["page"], "raw": raw_rel, "url": restorable[file_key]["url"], "detail": "raw file listed in SOURCES.md but missing locally; run fetch --restore"})
@@ -303,13 +303,11 @@ def render_text(report: Dict[str, Any]) -> str:
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    path = Path(args.target)
     try:
-        root = V.require_vault(str(path))
+        root, pages = V.pages_for(args.target)
     except V.VaultError as exc:
         print(str(exc), file=sys.stderr)
         return V.EXIT_USAGE
-    pages = [path] if path.is_file() else list(V.iter_pages(root, None if path.resolve() == root.resolve() else path))
     report = check(root, pages)
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))

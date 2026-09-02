@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch sources into raw/ as markdown with source metadata. The only writer into raw/.
+"""Fetch sources into raw/ as markdown with source metadata. The designated writer into raw/.
 
 Usage:
   fetch.py url URL [--vault V] [--stdin] [--title T] [--author A] [--published D] [--fidelity verbatim|summary] [--json]
@@ -113,17 +113,23 @@ def split_extractor_header(content: str) -> Tuple[Dict[str, Any], str]:
     return meta, body.lstrip("\n")
 
 
-def write_raw(root: Path, title: str, resource: str, body: str, author: Optional[str], published: Optional[str], fidelity: str, filename: Optional[str] = None) -> Path:
+def write_raw(root: Path, body: str, meta: Dict[str, Any], filename: Optional[str] = None) -> Path:
+    """Write raw/<file> with frontmatter title, resource, fetched, author, published, fidelity.
+
+    meta carries title and resource (required), author and published (optional) and fidelity
+    (default verbatim). Refuses to overwrite: raw is immutable.
+    """
+    title = str(meta["title"])
     name = filename or (safe_filename(title) + ".md")
     path = V.raw_dir(root) / name
     if path.exists():
         raise FetchError(f"raw file already exists: {V.rel(root, path)} (raw is immutable; delete it by hand to refetch)")
-    data: Dict[str, Any] = {"title": title, "resource": resource, "fetched": V.today()}
-    if author:
-        data["author"] = author
-    if published:
-        data["published"] = published
-    data["fidelity"] = fidelity
+    data: Dict[str, Any] = {"title": title, "resource": meta["resource"], "fetched": V.today()}
+    if meta.get("author"):
+        data["author"] = meta["author"]
+    if meta.get("published"):
+        data["published"] = meta["published"]
+    data["fidelity"] = meta.get("fidelity") or "verbatim"
     path.parent.mkdir(parents=True, exist_ok=True)
     fm_lines = [f"{k}: {FM.scalar_out(v)}" for k, v in data.items()]
     path.write_text("---\n" + "\n".join(fm_lines) + "\n---\n\n" + body.strip("\n") + "\n", encoding="utf-8")
@@ -155,7 +161,7 @@ def _cmd_url(args: argparse.Namespace) -> int:
             fidelity = args.fidelity or "verbatim"
         meta, body = split_extractor_header(content)
         title = args.title or meta.get("title") or _title_from_body(body, urllib.parse.urlparse(args.url).path.rstrip("/").split("/")[-1] or args.url)
-        path = write_raw(root, title, args.url, body, args.author or meta.get("author"), args.published or meta.get("published"), fidelity)
+        path = write_raw(root, body, {"title": title, "resource": args.url, "author": args.author or meta.get("author"), "published": args.published or meta.get("published"), "fidelity": fidelity})
     except FetchError as exc:
         print(str(exc), file=sys.stderr)
         return V.EXIT_FINDINGS
@@ -222,7 +228,7 @@ def _cmd_github(args: argparse.Namespace) -> int:
                     item["resource"] = item["resource"].replace("/blob/main/", "/blob/master/", 1)
                 else:
                     raise
-            path = write_raw(root, item["title"], item["resource"], content, item["author"], None, "verbatim", filename=Path(item["path"]).name)
+            path = write_raw(root, content, {"title": item["title"], "resource": item["resource"], "author": item["author"]}, filename=Path(item["path"]).name)
             fetched.append(V.rel(root, path))
         except FetchError as exc:
             failed.append({"file": item["file"], "error": str(exc)})
@@ -250,7 +256,7 @@ def _cmd_restore(args: argparse.Namespace) -> int:
             plan = plan_url(row["url"])
             content = download(plan["url"]) if plan["mode"] == "download" else extract_article(row["url"])
             meta, body = split_extractor_header(content)
-            path = write_raw(root, row["title"] or meta.get("title") or Path(file).stem, row["url"], body, meta.get("author"), meta.get("published"), "verbatim", filename=file)
+            path = write_raw(root, body, {"title": row["title"] or meta.get("title") or Path(file).stem, "resource": row["url"], "author": meta.get("author"), "published": meta.get("published")}, filename=file)
             restored.append(V.rel(root, path))
         except FetchError as exc:
             failed.append({"file": file, "url": row["url"], "error": str(exc)})

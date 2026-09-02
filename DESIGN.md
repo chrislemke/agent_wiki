@@ -90,7 +90,9 @@ canonical page is byte-identical.
 
 **D12. Required fields per type; unknown fields allowed.** Every page needs
 `type`, `title`, `description`, `created`, `generated`. Source pages add
-`raw`, `raw_sha`, `disposition`, `ingested`. Analysis pages add `question`.
+`raw`, `raw_sha`, `disposition`, `ingested`; `author`, `published` and
+`resource` are recorded when the raw file knows them and are optional because
+many sources have no known author or date. Analysis pages add `question`.
 Unknown fields and unknown types produce warnings, never rejections, so a vault
 from a newer plugin still works with an older one, and a domain can extend the
 schema.
@@ -275,8 +277,11 @@ edits made in Obsidian bypass hooks by design.
 **D39. Python 3 standard library only.** Scripts and hooks run with the
 system `python3` (3.9 or newer) so a vault works on a machine without `uv`.
 Each script is one entry point per concern with subcommands, a `--json` flag,
-and exit codes 0 clean, 1 findings, 2 usage. No script ever writes inside
-`raw/`.
+and exit codes 0 clean, 1 findings, 2 usage (`vault.py detect` exits 1 when no
+vault encloses the path, since "not found" is its finding). No script writes
+inside `raw/` except the two designated ones: `fetch.py`, which creates raw
+files and never overwrites, and `scaffold.py`, which creates the empty layout
+(`raw/assets/.gitkeep`, the `raw/SOURCES.md` header).
 
 **D40. One test seam.** A fixture vault on disk plus the script command line
 (and for hooks, a JSON event on stdin). Tests assert only on exit code, output
@@ -289,7 +294,21 @@ and restored with `fetch --restore`; lint reports a listed-but-missing raw file
 as "run restore", not as an error. MIT licence. No attribution trailers in
 history.
 
-## 9. Documented extensions, not built
+## 9. Additions beyond the specs
+
+Small things the implementation added that the specs did not name, kept
+because they cost little and remove a failure: the hook matchers include
+`NotebookEdit`; `stamp` also sets `ingested` on source pages; lint reports a
+fourth group, `fixable`, for what `--fix` would change; extra subcommands
+(`frontmatter.py set`, `links.py inbound`, `fetch.py plan-url`,
+`scaffold.py render-claude-md`, one `lint.py <checker>` per checker); extra
+Bash deny patterns (`touch`, `install`, `dd`, `rsync`, `ln`, git write verbs,
+whole-layer `rm`/`mv` and `cd raw && ...`); footnotes anywhere in a sentence,
+not only at its end, bind that sentence's literals; the index links
+`[[Basename|Title]]` when the two differ; and the OKF specification joined the
+example vault as a third, restorable seed source because the plugin builds on it.
+
+## 10. Documented extensions, not built
 
 Office formats via `markitdown`; directory sources; `fetch --crawl` with a host
 restriction; a git remote allowlist for confidential vaults; subagent-parallel
@@ -297,7 +316,7 @@ lint; slides and charts as query output; OKF export; attested computations; a
 one-click template repository; search tooling such as `qmd` once the index
 stops being enough.
 
-## 10. Prior art
+## 11. Prior art
 
 - Karpathy, *LLM Wiki* (gist 442a6bf555914893e9891c11519de94f): the three
   layers and the operations.

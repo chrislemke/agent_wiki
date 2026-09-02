@@ -2,7 +2,7 @@
 """Raw file hashing: compute SHA-256 of raw files and compare with source pages.
 
 Usage:
-  rawhash.py hash FILE
+  rawhash.py hash FILE [--json]
   rawhash.py compare PAGE|VAULT [--json]   Compare each source page's raw_sha with its raw file
 
 Exit codes: 0 all match, 1 mismatch or missing raw file, 2 usage. Read-only.
@@ -65,18 +65,17 @@ def _cmd_hash(args: argparse.Namespace) -> int:
     if not path.is_file():
         print(f"not a file: {path}", file=sys.stderr)
         return V.EXIT_USAGE
-    print(sha256(path))
+    digest = sha256(path)
+    print(json.dumps({"file": str(path), "sha256": digest}) if args.json else digest)
     return V.EXIT_OK
 
 
 def _cmd_compare(args: argparse.Namespace) -> int:
-    path = Path(args.target)
     try:
-        root = V.require_vault(str(path))
+        root, pages = V.pages_for(args.target)
     except V.VaultError as exc:
         print(str(exc), file=sys.stderr)
         return V.EXIT_USAGE
-    pages = [path] if path.is_file() else list(V.iter_pages(root, None if path.resolve() == root.resolve() else path))
     results = compare(root, pages)
     bad = [r for r in results if r["status"] != "match"]
     if args.json:
@@ -93,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("hash")
     p.add_argument("file")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_hash)
     p = sub.add_parser("compare")
     p.add_argument("target")

@@ -8,7 +8,7 @@ one section per page type in a fixed order, entries alphabetical by title as
 unparseable frontmatter are listed under "Needs attention" rather than dropped.
 
 Usage:
-  index.py build [--vault V]
+  index.py build [--vault V] [--json]
   index.py check [--vault V] [--json]     Exit 1 when the indexes differ from what build would write
 
 Exit codes: 0 clean, 1 drift, 2 usage.
@@ -149,6 +149,9 @@ def _cmd_build(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return V.EXIT_USAGE
     changed = build(root)
+    if args.json:
+        print(json.dumps({"written": [V.rel(root, p) for p in changed]}))
+        return V.EXIT_OK
     for p in changed:
         print(f"wrote {V.rel(root, p)}")
     if not changed:
@@ -178,6 +181,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("build")
     p.add_argument("--vault", default=None)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_build)
     p = sub.add_parser("check")
     p.add_argument("--vault", default=None)

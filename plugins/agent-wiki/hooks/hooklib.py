@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PLUGIN_ROOT / "scripts"))
+import frontmatter as FM  # noqa: E402
 import vault as V  # noqa: E402
 
 HEADING_RE = re.compile(r"^(#{1,2})\s+(.+?)\s*$", re.M)
@@ -66,7 +67,7 @@ def state_dir() -> Path:
     return d
 
 
-def _state_path(session_id: str) -> Path:
+def state_path(session_id: str) -> Path:
     safe = re.sub(r"[^A-Za-z0-9_.-]", "_", session_id or "default")
     return state_dir() / f"{safe}.json"
 
@@ -79,7 +80,7 @@ def file_hash(path: Path) -> Optional[str]:
 
 class SessionState:
     def __init__(self, session_id: str, root: Path):
-        self.path = _state_path(session_id)
+        self.path = state_path(session_id)
         self.root = root
         self.data: Dict[str, Any] = {
             "vault": str(root),
@@ -126,14 +127,28 @@ class SessionState:
     def log_changed(self) -> bool:
         return (file_hash(self.root / "log.md") or "") != (self.data.get("log_hash_at_start") or "")
 
+    @property
+    def touched(self) -> List[str]:
+        return list(self.data.get("touched", []))
+
+    @property
+    def created(self) -> List[str]:
+        return list(self.data.get("created", []))
+
+    def headings_before(self, rel: str) -> List[str]:
+        return list(self.data.get("headings", {}).get(rel, []))
+
+    def already_blocked_for(self, signature: str) -> bool:
+        return self.data.get("last_block_signature") == signature
+
+    def remember_block(self, signature: str) -> None:
+        self.data["last_block_signature"] = signature
+
 
 def headings_of(text: str) -> List[str]:
     try:
-        sys.path.insert(0, str(PLUGIN_ROOT / "scripts"))
-        import frontmatter as FM  # noqa: E402
-
         _, body = FM.split_frontmatter(text)
-    except Exception:  # noqa: BLE001 - any parse trouble: use the whole text
+    except FM.FrontmatterError:
         body = text
     return [m.group(2).strip() for m in HEADING_RE.finditer(body)]
 

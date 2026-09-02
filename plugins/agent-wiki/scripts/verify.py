@@ -2,7 +2,7 @@
 """Record a human review on a page: append a `verified` entry and touch nothing else.
 
 Usage:
-  verify.py PAGE --by HUMAN_ID [--vault V]
+  verify.py PAGE --by HUMAN_ID [--vault V] [--json]
 
 HUMAN_ID is recorded as `human:<id>` (a `human:` prefix is kept as given). The date is
 today. The rest of the file stays byte-identical. Exit 0 done, 1 page problem, 2 usage.
@@ -11,6 +11,7 @@ This is the only plugin script the PreToolUse guard lets change `verified`.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -74,6 +75,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("page")
     parser.add_argument("--by", required=True, help="human id, e.g. chris or human:chris")
     parser.add_argument("--vault", default=None)
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     path = Path(args.page)
     try:
@@ -94,7 +96,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"{V.rel(root, path)}: {exc}", file=sys.stderr)
         return V.EXIT_FINDINGS
     path.write_text(new_text, encoding="utf-8")
-    print(f"verified {V.rel(root, path)} by {actor} on {V.today()}")
+    if args.json:
+        print(json.dumps({"page": V.rel(root, path), "verified": {"by": actor, "at": V.today()}}))
+    else:
+        print(f"verified {V.rel(root, path)} by {actor} on {V.today()}")
     return V.EXIT_OK
 
 

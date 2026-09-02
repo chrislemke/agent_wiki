@@ -10,15 +10,15 @@ the loser only after every link is rewritten. Content merging is the caller's jo
 Neither command touches the raw folder.
 
 Usage:
-  rename.py rename PAGE NEW_TITLE [--vault V]
-  rename.py merge LOSER WINNER [--vault V]
+  rename.py rename PAGE NEW_TITLE [--vault V] [--json]
+  rename.py merge LOSER WINNER [--vault V] [--json]
 
 Exit codes: 0 done, 2 usage (missing page, target exists, reserved name).
 """
 from __future__ import annotations
 
 import argparse
-import re
+import json
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -26,16 +26,13 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import frontmatter as FM  # noqa: E402
 import index as IDX  # noqa: E402
+import links as L  # noqa: E402
 import vault as V  # noqa: E402
-
-
-def _link_pattern(old: str) -> "re.Pattern[str]":
-    return re.compile(r"(!?\[\[)" + re.escape(old) + r"(?=[\]|#])")
 
 
 def rewrite_links(root: Path, old: str, new: str, skip: Optional[Path] = None) -> List[Path]:
     """Rewrite wikilinks targeting `old` to `new` in every wiki page. Returns touched pages."""
-    pattern = _link_pattern(old)
+    pattern = L.link_pattern(old)
     touched: List[Path] = []
     for page in V.iter_pages(root):
         if skip is not None and page.resolve() == skip.resolve():
@@ -94,7 +91,7 @@ def rename(root: Path, page: Path, new_title: str) -> Dict[str, Any]:
     touched = rewrite_links(root, old_stem, target.stem)
     # the page's own self-references, if any
     self_text = target.read_text(encoding="utf-8")
-    new_self = _link_pattern(old_stem).sub(lambda m: m.group(1) + target.stem, self_text)
+    new_self = L.link_pattern(old_stem).sub(lambda m: m.group(1) + target.stem, self_text)
     if new_self != self_text:
         target.write_text(new_self, encoding="utf-8")
     IDX.build(root)
@@ -137,7 +134,7 @@ def _cmd_rename(args: argparse.Namespace) -> int:
     except (V.VaultError, FileNotFoundError, ValueError, FM.FrontmatterError) as exc:
         print(f"rename failed: {exc}", file=sys.stderr)
         return V.EXIT_USAGE
-    print(f"renamed {result['old']} -> {result['new']}; links rewritten in {len(result['links_rewritten_in'])} page(s)")
+    print(json.dumps(result) if args.json else f"renamed {result['old']} -> {result['new']}; links rewritten in {len(result['links_rewritten_in'])} page(s)")
     return V.EXIT_OK
 
 
@@ -150,7 +147,7 @@ def _cmd_merge(args: argparse.Namespace) -> int:
     except (V.VaultError, FileNotFoundError, ValueError, FM.FrontmatterError) as exc:
         print(f"merge failed: {exc}", file=sys.stderr)
         return V.EXIT_USAGE
-    print(f"merged {result['loser']} into {result['winner']}; links rewritten in {len(result['links_rewritten_in'])} page(s)")
+    print(json.dumps(result) if args.json else f"merged {result['loser']} into {result['winner']}; links rewritten in {len(result['links_rewritten_in'])} page(s)")
     return V.EXIT_OK
 
 
@@ -161,11 +158,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("page")
     p.add_argument("new_title")
     p.add_argument("--vault", default=None)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_rename)
     p = sub.add_parser("merge")
     p.add_argument("loser")
     p.add_argument("winner")
     p.add_argument("--vault", default=None)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_merge)
     return parser
 

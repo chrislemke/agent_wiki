@@ -1,5 +1,5 @@
 {
-  "description": "Write-like shell operations whose target is inside the raw folder. Each pattern is a Python regular expression matched against the whole command; the token RAW expands to raw_target (a path ending in raw/). Read-only commands (cat, rg, grep, head, sed without -i, ls, wc) never match. Extend this list rather than the hook code.",
+  "description": "Write-like shell operations whose target is inside the raw folder, or the folder itself. Each pattern is a Python regular expression matched against one pipeline segment; the token RAW expands to raw_target (a path ending in raw or raw/). After a segment that changes into raw/ (cd_into_raw), the following segments are matched with RAW removed, so any write there is denied. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. Extend this list rather than the hook code.",
   "deny": [
     {
       "name": "sed in place",
@@ -44,6 +44,10 @@
     {
       "name": "install or dd",
       "pattern": "\\b(?:install|dd|rsync|ln)\\s+[^|;&]*RAW"
+    },
+    {
+      "name": "git write verbs",
+      "pattern": "\\bgit\\s+(?:checkout|restore|clean|reset|rm|mv|stash)\\b[^|;&]*RAW"
     }
   ],
   "allow": [
@@ -54,11 +58,8 @@
     {
       "name": "plugin verify script",
       "pattern": "/scripts/verify\\.py\\b"
-    },
-    {
-      "name": "plugin scaffold script",
-      "pattern": "/scripts/scaffold\\.py\\b"
     }
   ],
-  "raw_target": "(?:[^\\s\"'|;&]*/)?raw/"
+  "raw_target": "(?:[^\\s\"'|;&]*/)?raw(?:/|(?=[\\s\"'|;&)]|$))",
+  "cd_into_raw": "\\bcd\\s+(?:-\\S+\\s+)*RAW"
 }
