@@ -122,6 +122,7 @@ def overview_page(a: Dict[str, Any], actor: str) -> str:
         "description": f"Hub page of {a['title']}: what this wiki covers and what is still open.",
         "created": today,
         "generated": {"by": actor, "at": today},
+        "sources": [],
     }
     body = (
         "\n# Overview\n\n"

@@ -9,7 +9,7 @@ State one before writing anything. `new`, `update` and `disputed` may combine; `
 - **new**: the source introduces entities, concepts or claims the wiki lacks. Creates pages (through the minting gate) and a source page.
 - **update**: the source adds to pages that exist. Augments them and adds itself to their `sources`.
 - **disputed**: the source contradicts a claim the wiki holds. Adds Status blocks and sets `status: contested` on the affected pages.
-- **no-material**: the source adds nothing beyond what the wiki already holds. Still gets a short source page (Summary and Assessment, one line each) so provenance and the backlog stay simple; nothing else changes.
+- **no-material**: the source adds nothing beyond what the wiki already holds. Still gets a short source page (Summary and Assessment, one line each) so provenance and the backlog stay simple; nothing else changes. Source pages are catalogued by the index and are never counted as orphans.
 
 ## The minting gate
 
@@ -28,6 +28,7 @@ Existing pages are augmented, never rewritten, unless the owner asks for a rewri
 
 - Keep every existing heading, in its order. Add bullets, sentences and new sections; do not delete or reword what is there.
 - `sources` only grows. Append `{id, page}` entries; never remove one.
+- `verified` stays exactly as it is on disk. Only the owner, through `/agent-wiki:verify` or their own editor, changes it; the write guard denies everything else.
 - A changed claim gets a Status block beneath it; the old text stays.
 - Refresh `generated.at` (with `frontmatter.py stamp`) only when the knowledge changed, not for formatting.
 - One link per concept mention per section: link the first mention in a section, write the plain name afterwards.
@@ -37,7 +38,7 @@ Existing pages are augmented, never rewritten, unless the owner asks for a rewri
 The LLM records disagreements and never resolves them.
 
 - Contradiction between sources: keep both claims, add directly beneath the claim
-  `> **Status: Disputed**` and a second blockquote line naming both claims with their source pages, set `status: contested`.
+  `> **Status: Disputed**` and a second blockquote line `> [[Source A]] says <claim A>; [[Source B]] says <claim B>. Unresolved.`, and set `status: contested`.
 - Newer source explicitly updates an older claim (a version change, a retraction, a correction): keep the old text, add `> **Status: Outdated** (YYYY-MM-DD)` with what replaced it and its source page.
 - Whole subject superseded: `status: deprecated`, a `Superseded by [[Successor]].` line under the first heading, and a back-link from the successor.
 - In an interactive ingest you may ask the owner which reading they favour; in batch mode you only record. Resolution is the owner's edit or answer.

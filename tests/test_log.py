@@ -45,3 +45,10 @@ def test_tail_text_output_prints_entries(vault: Path):
     r = run_script("log.py", "tail", "5", "--vault", str(vault))
     assert r.code == 0
     assert "## [2026-09-02] fetch | Some URL" in r.out
+
+
+def test_append_accepts_several_pages_after_one_flag(vault: Path):
+    r = run_script("log.py", "append", "--op", "ingest", "--title", "T", "--created", "A", "B", "--updated", "C", "--updated", "D", "--vault", str(vault), env={"AGENT_WIKI_TODAY": "2026-09-02"})
+    assert r.code == 0, r
+    text = (vault / "log.md").read_text(encoding="utf-8")
+    assert "- Created: [[A]], [[B]]\n- Updated: [[C]], [[D]]\n" in text

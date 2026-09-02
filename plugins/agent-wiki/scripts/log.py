@@ -10,7 +10,7 @@ Entry format:
 Operations: init, fetch, ingest, ingest-failed, query, lint, verify, schema.
 
 Usage:
-  log.py append --op OP --title T [--created P]... [--updated P]... [--note N] [--vault V]
+  log.py append --op OP --title T [--created P [P ...]] [--updated P [P ...]] [--note N] [--vault V]
   log.py parse [--vault V] [--json]
   log.py tail N [--vault V] [--json]
   log.py since-lint [--vault V] [--json]
@@ -183,8 +183,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("append")
     p.add_argument("--op", required=True)
     p.add_argument("--title", required=True)
-    p.add_argument("--created", action="append")
-    p.add_argument("--updated", action="append")
+    p.add_argument("--created", nargs="+", action="extend", default=[], help="page(s) created; repeatable")
+    p.add_argument("--updated", nargs="+", action="extend", default=[], help="page(s) updated; repeatable")
     p.add_argument("--note", default=None)
     p.add_argument("--vault", default=None)
     p.set_defaults(func=_cmd_append)

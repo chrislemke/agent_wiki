@@ -292,14 +292,16 @@ def check_orphans(ctx: Context) -> List[Finding]:
         for a in FM.as_list(data.get("aliases")):
             alias_of[str(a)] = p
     for p in ctx.catalog.pages:
-        for link in L.extract_links(p.read_text(encoding="utf-8")):
-            target = ctx.catalog.resolve(link["target"])
+        for name in L.all_targets(p.read_text(encoding="utf-8")):
+            target = ctx.catalog.resolve(name)
             if target is not None and target.resolve() != p.resolve():
                 inbound[str(target.resolve())] = inbound.get(str(target.resolve()), 0) + 1
     out: List[Finding] = []
     for p in ctx.pages:
         if p.stem == HUB_PAGE or V.is_reserved(p):
             continue
+        if (ctx.parsed.get(p) or {}).get("type") == "source":
+            continue  # source pages are provenance anchors, catalogued by the index; citations reach them via sources[]
         if inbound.get(str(p.resolve()), 0) == 0:
             out.append(finding("orphan", "judgement", ctx.rel(p), "no inbound wikilinks from other pages", "link it from a related page or the Overview, or merge it"))
     return out

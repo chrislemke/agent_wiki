@@ -57,6 +57,36 @@ def _normalize(value: Any) -> str:
     return json.dumps(FM.as_list(value) if value not in (None, "") else [], sort_keys=True)
 
 
+VERIFIED_BLOCK_RE = re.compile(r"^verified:.*(?:\n[ \t-].*)*", re.M)
+SOURCE_ID_RE = re.compile(r"^\s*-\s*id:\s*(.+?)\s*$", re.M)
+
+
+def _frontmatter_text(text: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    return text[3:end] if end >= 0 else text[3:]
+
+
+def _textual_guard(root: Path, path: Path, current: str, projected: str) -> Optional[str]:
+    """When the projected frontmatter cannot be parsed, compare the guarded fields as text.
+
+    Fails closed: a `verified` block that differs, or a source id that disappears, is denied
+    even though the YAML is broken. PostToolUse will still warn about the parse error.
+    """
+    old_fm, new_fm = _frontmatter_text(current), _frontmatter_text(projected)
+    old_verified = VERIFIED_BLOCK_RE.findall(old_fm)
+    new_verified = VERIFIED_BLOCK_RE.findall(new_fm)
+    if old_verified != new_verified:
+        return (f"{V.rel(root, path)}: this write changes `verified` (and its frontmatter does not parse). "
+                "Leave `verified` exactly as on disk; only /agent-wiki:verify records reviews.")
+    lost = [i for i in SOURCE_ID_RE.findall(old_fm) if i not in SOURCE_ID_RE.findall(new_fm)]
+    if lost:
+        return (f"{V.rel(root, path)}: this write removes source id(s) {', '.join(lost)} from `sources` "
+                "(and its frontmatter does not parse). Provenance only grows; keep every existing source entry.")
+    return None
+
+
 def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
     """Return a denial reason for a wiki page write, or None."""
     current = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else None
@@ -66,7 +96,7 @@ def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
     try:
         new_data, _ = FM.parse_text(projected)
     except FM.FrontmatterError:
-        return None  # PostToolUse will warn about unparseable frontmatter
+        return _textual_guard(root, path, current or "", projected)
     old_data: Optional[Dict[str, Any]] = None
     if current is not None:
         try:

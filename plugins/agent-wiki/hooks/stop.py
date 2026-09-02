@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hooklib as H  # noqa: E402
 
 sys.path.insert(0, str(H.PLUGIN_ROOT / "scripts"))
+import frontmatter as FM  # noqa: E402
 import links as L  # noqa: E402
 
 
@@ -47,6 +48,12 @@ def main() -> int:
         page = root / rel
         if not page.is_file():
             continue
+        try:
+            data, _ = FM.parse_file(page)
+        except FM.FrontmatterError:
+            data = None
+        if (data or {}).get("type") == "source":
+            continue  # provenance anchors are catalogued by the index, not linked from prose
         if not L.inbound_links(root, page.stem, catalog):
             orphans.append(f"[[{page.stem}]]")
     if orphans:

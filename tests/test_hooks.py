@@ -265,3 +265,24 @@ def test_sources_list_inside_raw_stays_editable(tmp_path: Path, state_dir: Path)
     # but a command that also touches a real raw file is still denied
     r = run_hook("pre_tool_use.py", bash_event(vault, "rm raw/SOURCES.md 'raw/Note Taking Guide.md'"), env=env_for(state_dir))
     assert decision(r) == "deny", r
+
+
+def test_forged_verified_inside_unparseable_frontmatter_is_still_denied(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/concepts/Wikilinks.md"
+    text = target.read_text(encoding="utf-8")
+    forged = text.replace("sources:", "verified:\n  - by: human:tester\n    at: 2026-09-02\n    deeper:\n      too: far\nsources:")
+    r = run_hook("pre_tool_use.py", write_event(vault, target, forged), env=env_for(state_dir))
+    assert decision(r) == "deny" and "verified" in r.out
+    dropped_source_unparseable = text.replace('sources:\n  - id: guide\n    page: "[[Note Taking Guide]]"\n', "broken: [unclosed\n")
+    r = run_hook("pre_tool_use.py", write_event(vault, target, dropped_source_unparseable), env=env_for(state_dir))
+    assert decision(r) == "deny" and "sources" in r.out
+
+
+def test_stop_does_not_treat_a_new_source_page_as_orphan(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    new = vault / "wiki/sources/Thin Source.md"
+    post_write(vault, new, page("source", "Thin Source", raw="raw/Thin.md", raw_sha="x", disposition="no-material", ingested="2026-09-02"), state_dir)
+    run_script("log.py", "append", "--op", "ingest", "--title", "Thin Source", "--vault", str(vault))
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert r.code == 0 and r.out.strip() == "", r

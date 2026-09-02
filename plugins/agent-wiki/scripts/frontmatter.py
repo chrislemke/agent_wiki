@@ -12,7 +12,7 @@ Usage:
   frontmatter.py parse PAGE [--json]
   frontmatter.py normalize PAGE...             Rewrite frontmatter in canonical key order
   frontmatter.py validate PAGE|VAULT [--json]  Required fields per type, enums, ISO dates
-  frontmatter.py stamp PAGE --by ACTOR [--vault V]
+  frontmatter.py stamp PAGE --by ACTOR [--vault V]   Sets generated, created and stale_after (and ingested on source pages)
   frontmatter.py set PAGE KEY VALUE            Set a scalar key (never verified)
 
 Exit codes: 0 clean, 1 findings or errors, 2 usage. Python 3 stdlib only.
@@ -490,6 +490,8 @@ def stamp(path: Path, actor: str, root: Optional[Path]) -> Dict[str, Any]:
     data["generated"] = {"by": actor, "at": now}
     if not data.get("created"):
         data["created"] = now
+    if data.get("type") == "source" and not data.get("ingested"):
+        data["ingested"] = now
     staleness: Dict[str, Any] = {}
     if root is not None:
         settings = V.read_settings(root)

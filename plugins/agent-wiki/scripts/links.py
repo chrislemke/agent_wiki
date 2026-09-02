@@ -186,8 +186,27 @@ def resolve_pages(root: Path, pages: List[Path], catalog: Optional[Catalog] = No
     return result
 
 
+def source_links(text: str) -> List[str]:
+    """Targets named in frontmatter sources[].page (a citation is an inbound reference too)."""
+    try:
+        data, _ = FM.parse_text(text)
+    except FM.FrontmatterError:
+        return []
+    out: List[str] = []
+    for entry in FM.as_list((data or {}).get("sources")):
+        if isinstance(entry, dict):
+            m = re.match(r"^\[\[([^\]|#]+)", str(entry.get("page", "")).strip())
+            if m:
+                out.append(m.group(1).strip())
+    return out
+
+
+def all_targets(text: str) -> List[str]:
+    return [l["target"].split("/")[-1] for l in extract_links(text)] + source_links(text)
+
+
 def inbound_links(root: Path, target: str, catalog: Optional[Catalog] = None) -> List[Path]:
-    """Pages (other than the target itself) that link to target by basename or alias."""
+    """Pages (other than the target itself) that link to target by basename or alias, in the body or in sources[].page."""
     cat = catalog or Catalog(root)
     target_path = cat.resolve(target)
     names = {target}
@@ -203,10 +222,8 @@ def inbound_links(root: Path, target: str, catalog: Optional[Catalog] = None) ->
     for p in cat.pages:
         if target_path is not None and p.resolve() == target_path.resolve():
             continue
-        for link in extract_links(p.read_text(encoding="utf-8")):
-            if link["target"].split("/")[-1] in names:
-                hits.append(p)
-                break
+        if any(t in names for t in all_targets(p.read_text(encoding="utf-8"))):
+            hits.append(p)
     return hits
 
 

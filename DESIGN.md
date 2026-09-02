@@ -118,8 +118,10 @@ literals are checked against all of the page's sources. Lint checks that every
 footnote resolves and every definition is used.
 
 **D17. Verification is a control, not a convention.** `verified` is set only by
-the `verify` skill (a plugin script) or by a human editing the file. A hook
-denies any write from the LLM that changes `verified`. Approving an ingest plan
+the `verify` skill (a plugin script) or by a human editing the file. The skill
+is user-invoked, so the model cannot decide on its own that the owner reviewed
+a page. A hook denies any write from the LLM that changes `verified`, falling
+back to a textual comparison when the written frontmatter does not even parse. Approving an ingest plan
 is not reading the page, so it does not verify anything. Lint flags a page
 whose `generated.at` is later than its last `verified.at` as "review outdated";
 OKF treats the two as independent, which is precisely the hazard.
@@ -159,7 +161,11 @@ two or more sources or pages (or named as central by the domain lens).
 Otherwise the concept is mentioned inline and may be promoted later. Pages are
 earned by reuse, not created on first mention.
 
-**D23. Wanted pages.** Unresolved wikilinks are allowed. They are the Obsidian
+**D23. Wanted pages.** Unresolved wikilinks are allowed. Inbound links count
+body wikilinks and `sources[].page` citations alike; source pages are never
+orphans, since the index catalogues them and citations reach them through
+frontmatter. Hub pages that ground nothing declare `sources: []` so the evidence
+checker leaves their editorial text alone. They are the Obsidian
 "ghost node" idiom and a deterministic signal: a script counts inbound
 unresolved links and lint proposes creating any target with two or more. The
 typo risk is handled by a near-miss check (case-insensitive match or edit
@@ -185,7 +191,10 @@ default place to file findings.
 
 **D27. Six skills.** `init`, `fetch`, `ingest`, `query`, `lint`, `verify`.
 `status` was dropped because the SessionStart hook does it; `file` was dropped
-because filing is the last step of `query`.
+because filing is the last step of `query`. `init` and `verify` are user-invoked
+(no model triggering): creating a vault and recording a human review are the
+owner's calls. The other four carry trigger phrases so the model reaches them
+from ordinary requests inside a vault.
 
 **D28. One interactive gate in ingest.** After reading a source and searching
 the whole wiki for its entities and synonyms, the LLM states a disposition
@@ -213,7 +222,10 @@ source, so a bad ingest is one revert away. Failed sources are logged as
 the wiki cannot answer, read raw and say which page was too thin; that flag is
 a lint finding for free. Web search only when the domain block allows it.
 Answers cite pages as wikilinks and state how many cited pages are unverified.
-Every query is offered for filing as an analysis page and logged either way.
+Every query is offered for filing as an analysis page and logged either way;
+an unfiled query is committed with only its log entry, so the rule "every
+operation ends with a log entry and a commit" has no exception (the spec's
+"commit only when filed" was dropped for that consistency).
 
 **D33. Lint fixes structure, proposes semantics.** Deterministic problems
 (index drift, key order, unique near-miss links, missing `created` derivable

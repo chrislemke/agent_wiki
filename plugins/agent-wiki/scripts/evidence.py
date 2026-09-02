@@ -246,7 +246,9 @@ def check_page(root: Path, page: Path, catalog: L.Catalog, restorable: Dict[str,
         raws_by_id[sid] = (raw_rel, raw_body(raw_path))
     candidates = extract_candidates(body)
     if not raws_by_id:
-        if not data.get("sources"):
+        if "sources" not in data:
+            # no sources at all: every literal is ungrounded. An explicit `sources: []`
+            # declares that the page grounds nothing (a hub page's editorial text) and is skipped.
             for c in candidates:
                 result["suspects"].append({"page": result["page"], "kind": c.kind, "value": c.value, "footnote": None, "checked": [], "detail": "page has no sources; literal cannot be grounded"})
         return result

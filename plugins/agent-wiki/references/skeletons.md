@@ -1,6 +1,8 @@
 # Page skeletons
 
-One skeleton per page type. Keep the section names exactly; omit a section that would be empty. Frontmatter values are plain strings; dates are `YYYY-MM-DD`. `generated.by` is `agent-wiki/<model-id>`. Stamp every page you write with `frontmatter.py stamp` instead of computing dates yourself.
+One skeleton per page type. Keep the section names exactly; omit a section that would be empty. Frontmatter values are plain strings; frontmatter dates are `YYYY-MM-DD`. `generated.by` is `agent-wiki/<model-id>`. Stamp every page you write with `frontmatter.py stamp` instead of computing dates yourself: it sets `generated`, `created`, `stale_after`, and `ingested` on source pages.
+
+Dates and numbers in the body are written exactly as the source writes them (the evidence checker looks them up verbatim), so a Timeline entry says `May 2024` when the source does.
 
 Footnotes: a load-bearing claim ends with `[^id]` where `id` is a `sources[].id`; definitions `[^id]: <source title>` go at the very end of the page.
 
@@ -25,7 +27,8 @@ disposition: new | update | disputed | no-material
 author: <from the raw frontmatter, if known>
 published: <YYYY-MM-DD, if known>
 resource: <URL from the raw frontmatter>
-ingested: <date>
+fidelity: <copy from the raw frontmatter only when it says summary>
+ingested: <set by stamp>
 ---
 
 # <Title>
@@ -79,7 +82,7 @@ sources:
 - <Fact, as found.>[^<short-id>]
 
 ## Timeline
-- <YYYY-MM-DD or YYYY-MM>: <event>[^<short-id>]
+- <date as the source writes it>: <event>[^<short-id>]
 
 ## Relationships
 - [[<Other Entity>]]: <relation in one clause>

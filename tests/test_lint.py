@@ -156,3 +156,28 @@ def test_markdown_summary_groups_findings(tmp_path: Path):
     r = run_script("lint.py", "all", "--vault", str(vault))
     assert r.code == 1
     assert "## Needs judgement" in r.out and "## Informational" in r.out and "## Fixable" in r.out
+
+
+def test_source_pages_are_never_orphans_and_frontmatter_source_links_count_as_inbound(tmp_path: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    (vault / "wiki/sources/Thin.md").write_text(page("source", "Thin", raw="raw/Thin.md", raw_sha="x", disposition="no-material", ingested="2026-09-02"), encoding="utf-8")
+    (vault / "raw/Thin.md").write_text("nothing new\n", encoding="utf-8")
+    # an entity linked only from frontmatter sources of another page
+    (vault / "wiki/sources/Cited Only.md").write_text(page("source", "Cited Only", raw="raw/Cited.md", raw_sha="x", disposition="new", ingested="2026-09-02"), encoding="utf-8")
+    (vault / "raw/Cited.md").write_text("cited\n", encoding="utf-8")
+    text = page("entity", "Citer", body="Links to [[Overview]].").replace("---\n\n# ", 'sources:\n  - id: c\n    page: "[[Cited Only]]"\n---\n\n# ', 1)
+    (vault / "wiki/entities/Citer.md").write_text(text, encoding="utf-8")
+    r = run_script("lint.py", "orphans", "--vault", str(vault), "--json")
+    pages = {f["page"] for f in r.json()["findings"]}
+    assert not any(p.endswith(("Thin.md", "Cited Only.md")) for p in pages)
+    assert any(p.endswith("Citer.md") for p in pages)  # nothing links to Citer
+    inbound = run_script("links.py", "inbound", "Cited Only", "--vault", str(vault), "--json").json()
+    assert inbound["count"] == 1 and inbound["inbound"][0].endswith("Citer.md")
+
+
+def test_explicitly_empty_sources_suppresses_ungrounded_suspects(tmp_path: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    (vault / "wiki/syntheses/Overview.md").write_text(page("synthesis", "Overview", sources=[], body="## Thesis\nFounded in 2024 to keep 1,000 notes.\n").replace("sources: []", "sources: []"), encoding="utf-8")
+    r = run_script("evidence.py", "check", str(vault / "wiki/syntheses/Overview.md"), "--json")
+    assert r.code == 0, r
+    assert r.json()["suspects"] == []

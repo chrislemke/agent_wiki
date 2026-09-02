@@ -222,3 +222,14 @@ def test_set_updates_scalar_and_keeps_canonical_order(vault: Path):
     assert r.code == 0, r
     data = run_script("frontmatter.py", "parse", str(p), "--json").json()["frontmatter"]
     assert data["status"] == "contested"
+
+
+def test_stamp_sets_ingested_on_source_pages_when_missing(vault: Path):
+    text = "---\ntype: source\ntitle: S\ndescription: d\nraw: raw/S.md\nraw_sha: x\ndisposition: new\n---\nBody\n"
+    p = write(vault, "wiki/sources/S.md", text)
+    r = run_script("frontmatter.py", "stamp", str(p), "--by", "agent-wiki/t", env={"AGENT_WIKI_TODAY": "2026-09-02"})
+    assert r.code == 0, r
+    data = run_script("frontmatter.py", "parse", str(p), "--json").json()["frontmatter"]
+    assert data["ingested"] == "2026-09-02"
+    r = run_script("frontmatter.py", "stamp", str(p), "--by", "agent-wiki/t", env={"AGENT_WIKI_TODAY": "2026-09-03"})
+    assert run_script("frontmatter.py", "parse", str(p), "--json").json()["frontmatter"]["ingested"] == "2026-09-02"
