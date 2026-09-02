@@ -42,3 +42,7 @@
 - Created: [[Agent Skills]], [[Cascade Updates]]
 - Updated: [[Grounding Invariant]], [[Overview]]
 - Note: Structural pass clean. Proposed and created two wanted pages (gate met: wanted by 3 and 2 pages). Semantic: added a cross-reference on Grounding Invariant; filed two open questions on the Overview (thin Claude Code page, single-source wanted pages).
+
+## [2026-09-02] verify | LLM Wiki
+- Updated: [[LLM Wiki]]
+- Note: Recorded by the seeding run per spec 5 acceptance; the evidence check passed. Owner: read the page against raw/LLM Wiki.md or revert this commit.

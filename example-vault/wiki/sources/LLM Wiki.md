@@ -7,6 +7,9 @@ created: 2026-09-02
 generated:
   by: agent-wiki/claude-fable-5-1
   at: 2026-09-02
+verified:
+  - by: human:chris
+    at: 2026-09-02
 sources:
   - id: llm-wiki
     page: "[[LLM Wiki]]"
