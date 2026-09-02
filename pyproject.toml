@@ -1,14 +1,14 @@
 [project]
 name = "agent-wiki"
 version = "0.1.0"
-description = "Tests and tooling for the agent-wiki Claude Code plugin. The plugin scripts themselves are Python 3 standard library only."
+description = "Tests and tooling for the agent-wiki Claude Code plugin. The plugin scripts themselves are Python 3 standard library only and run on Python 3.9 or newer; the tests launch them with the system python3 (see tests/conftest.py)."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = []
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=9.0.3"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

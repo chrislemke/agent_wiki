@@ -22,6 +22,10 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 TODAY = __import__("datetime").date.today().isoformat()
 
+# The scripts and hooks are run the way Claude Code runs them: with the system `python3`,
+# which is the compatibility floor (3.9). AGENT_WIKI_TEST_PYTHON overrides the interpreter.
+PYTHON = os.environ.get("AGENT_WIKI_TEST_PYTHON") or ("/usr/bin/python3" if os.path.exists("/usr/bin/python3") else shutil.which("python3") or sys.executable)
+
 MARKER = {"schema_version": 1, "plugin_version": "0.1.0", "created": "2026-09-01"}
 
 GENERIC_BLOCK = (PLUGIN / "references" / "generic-block.md").read_text(encoding="utf-8").strip()
@@ -129,7 +133,7 @@ class Result:
 
 
 def run_script(name: str, *args: str, cwd: Path | None = None, stdin: str | None = None, env: dict | None = None) -> Result:
-    cmd = [sys.executable, str(SCRIPTS / name), *args]
+    cmd = [PYTHON, str(SCRIPTS / name), *args]
     full_env = dict(os.environ)
     if env:
         full_env.update(env)
@@ -138,7 +142,7 @@ def run_script(name: str, *args: str, cwd: Path | None = None, stdin: str | None
 
 
 def run_hook(name: str, event: dict, cwd: Path | None = None, env: dict | None = None) -> Result:
-    cmd = [sys.executable, str(HOOKS / name)]
+    cmd = [PYTHON, str(HOOKS / name)]
     full_env = dict(os.environ)
     full_env.setdefault("CLAUDE_PLUGIN_ROOT", str(PLUGIN))
     if env:
