@@ -30,7 +30,7 @@ Two passes. The deterministic pass runs the checkers and applies the auto-fix po
 
 3. **Semantic pass** over the scope. Read the pages and look for: two pages stating incompatible claims without a Status block; a claim a newer source supersedes, still standing without `Status: Outdated`; a page mentioning a topic that has a page without linking it; thin pages (an entity with a definition and nothing else, a source page whose claims reached no other page); questions a web search could settle (only when `web_search` is `"true"` and `confidential` is `"false"` in `vault.py settings --json`). Add the Status blocks and cross-references that are unambiguous; the rest become findings. Done when every page in scope has been read once.
 
-4. **File open findings.** Append each unresolved finding as a bullet under `## Open questions` of the most relevant synthesis page, defaulting to `wiki/syntheses/Overview.md`, in the form `- [lint YYYY-MM-DD] <finding> ([[Page A]], [[Page B]])`. Stamp each synthesis page you touched. Done when every judgement finding is either fixed, confirmed by the owner, or filed.
+4. **File open findings.** Append each unresolved finding as a bullet under `## Open questions` of the most relevant synthesis page, defaulting to `wiki/syntheses/Overview.md`, in the form `- [lint YYYY-MM-DD] <finding> ([[Page A]], [[Page B]])`. Name a wanted page in plain text there, not as a link, or the filing itself becomes a second wanting page. Stamp each synthesis page you touched. Done when every judgement finding is either fixed, confirmed by the owner, or filed.
 
 5. **Index, log, commit.**
 
