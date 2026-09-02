@@ -15,6 +15,7 @@ A working reference on Claude Code and agentic coding practice: how the tool wor
 
 ## Evidence
 - [[LLM Wiki]] is the founding text: the LLM compiles immutable raw sources into a wiki and keeps it current, the human curates and asks. Summarised as the [[LLM Wiki Pattern]].
+- [[karpathy-llm-wiki README]] shows the pattern in production as an Agent Skills skill and lists what its author chose not to build; it disagrees with the founding text on search tooling. Entities: [[Andrej Karpathy]], [[Claude Code]].
 
 ## Open questions
 - Which Claude Code documentation pages to ingest first: skills, hooks, or plugins?

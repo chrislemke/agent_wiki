@@ -14,3 +14,8 @@
 - Created: [[LLM Wiki]], [[LLM Wiki Pattern]]
 - Updated: [[Overview]]
 - Note: disposition: new. Interactive gate run unattended during seeding; takeaways: RAG vs compounding wiki, three layers, three operations, index and log, human curates and LLM keeps books. Wanted pages left: Obsidian, Claude Code, Andrej Karpathy.
+
+## [2026-09-02] ingest | karpathy-llm-wiki README
+- Created: [[karpathy-llm-wiki README]], [[Andrej Karpathy]], [[Claude Code]]
+- Updated: [[LLM Wiki Pattern]], [[Overview]]
+- Note: disposition: new, update, disputed. Batch mode. Dispute recorded on LLM Wiki Pattern (search tooling). Wanted pages: karpathy-llm-wiki, Agent Skills, Open Knowledge Format, Obsidian.
