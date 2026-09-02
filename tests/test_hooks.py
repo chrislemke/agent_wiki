@@ -252,3 +252,16 @@ def test_hooks_manifest_registers_the_four_hooks():
                 assert h["type"] == "command" and "${CLAUDE_PLUGIN_ROOT}/hooks/" in h["command"] and h["command"].startswith("python3 ")
                 script = h["command"].split("${CLAUDE_PLUGIN_ROOT}/hooks/")[1].strip('"')
                 assert (PLUGIN / "hooks" / script).is_file(), script
+
+
+# ------------------------------------------------------------------ raw/SOURCES.md is a list, not a source
+
+def test_sources_list_inside_raw_stays_editable(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", write_event(vault, vault / "raw/SOURCES.md", "# Sources\n"), env=env_for(state_dir))
+    assert decision(r) == "allow", r
+    r = run_hook("pre_tool_use.py", bash_event(vault, "echo '| A | https://x | A.md | MIT |' >> raw/SOURCES.md"), env=env_for(state_dir))
+    assert decision(r) == "allow", r
+    # but a command that also touches a real raw file is still denied
+    r = run_hook("pre_tool_use.py", bash_event(vault, "rm raw/SOURCES.md 'raw/Note Taking Guide.md'"), env=env_for(state_dir))
+    assert decision(r) == "deny", r

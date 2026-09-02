@@ -242,8 +242,9 @@ silent outside a vault:
   lint, stale pages and the most wanted pages.
 - PreToolUse denies writes into `raw/` from Write, Edit, MultiEdit and from
   write-like Bash commands (in-place sed, mv, cp, rm, tee, redirections, inline
-  interpreters), with the plugin's fetch and verify scripts allowlisted. It
-  also denies writes that change `verified` or shrink `sources`.
+  interpreters), with the plugin's fetch and verify scripts allowlisted and
+  `raw/SOURCES.md` exempt, since it is a list of sources rather than a source.
+  It also denies writes that change `verified` or shrink `sources`.
 - PostToolUse warns on invalid frontmatter, removed top-level headings and
   near-miss link targets. It never undoes a write.
 - Stop blocks once when wiki files changed without a log entry, or when a page

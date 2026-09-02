@@ -93,6 +93,11 @@ def guard_bash(root: Path, command: str) -> Optional[str]:
         if re.search(rule["pattern"], command):
             return None
     raw_target = cfg["raw_target"]
+    # raw/SOURCES.md is the list of restorable sources, not a source: a command whose only
+    # raw/ mentions are that file passes.
+    mentions = re.findall(r"raw/[^\s\"'|;&)]*", command)
+    if mentions and all(m.endswith(V.SOURCES_LIST) for m in mentions):
+        return None
     for rule in cfg.get("deny", []):
         pattern = rule["pattern"].replace("RAW", raw_target)
         if re.search(pattern, command):
@@ -118,7 +123,7 @@ def main() -> int:
         path = H.tool_file_path(event)
         if path is None:
             return 0
-        if V.in_raw(root, path):
+        if V.in_raw(root, path) and path.name != V.SOURCES_LIST:
             H.deny(f"{V.rel(root, path)} is inside raw/, the immutable source layer. Nothing edits raw files; "
                    "to add a source use /agent-wiki:fetch, to replace one ask the owner.")
             return 0
