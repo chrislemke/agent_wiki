@@ -59,17 +59,25 @@ A typical run looks like this:
 /agent-wiki:query <question>
 ```
 
-Replace `<url>`, `<file>` and `<question>` with your own values. You can also put files into `raw/` yourself instead of fetching them. When you ingest a source, Claude first shows what it found and which pages it plans to change. After a query, it asks whether you want to save the answer as a new page; answer `yes` if the result should become part of the wiki.
+Replace `<url>`, `<file>` and `<question>` with your own values.
 
 You do not always need to type the query command. If you ask a question that is clearly about your wiki, Claude can choose the `query` skill automatically. Use `/agent-wiki:query <question>` when you want to make sure Claude searches the wiki; the explicit command is more reliable.
 
-For day-to-day use:
+Day to day, the work is a loop: collect, ingest, read, ask, tidy, review. Most days you only do the first four.
 
-- Add new material with `/agent-wiki:fetch <url>` or by placing files in `raw/`, then ingest it. Use `/agent-wiki:ingest --all` to work through everything waiting in the inbox.
-- Ask questions naturally and let Claude choose the `query` skill, or use `/agent-wiki:query <question>` for the most reliable wiki lookup. File useful answers so the wiki grows with your work.
-- Open the vault in Obsidian whenever you want to browse the linked pages directly.
-- After checking an important page against its sources, record that review with `/agent-wiki:verify <page>`.
-- Run `/agent-wiki:lint` occasionally to repair simple problems and collect anything that needs your judgement.
+**Collect sources.** When you find something worth keeping, get it into `raw/`. Give Claude a link and it saves the page as a markdown file with title, author and date. For a GitHub repository it saves the README, plus any files you name with `--files`. You can also copy files in yourself: notes from a meeting, an exported chapter, a paper you converted to markdown. Images are not fetched; the Obsidian Web Clipper with "download attachments" switched on puts them into `raw/assets/`. Once a file is in `raw/`, Claude never edits it. It is the evidence every page points back to.
+
+**Ingest one source.** Point Claude at a file in `raw/`. It reads the whole thing, searches the wiki for everything the source touches, and shows you a plan before it writes anything: the key takeaways, which pages it will create, which it will add to, and where the source disagrees with what the wiki already says. You say go, or change the plan. Then it writes. If you trust the source, `--batch` skips the question. `--all` works through every file in `raw/` that has no page yet, one after another. Each source becomes one page under `wiki/sources/`, and its facts flow into the pages about the people, tools and ideas it mentions. Every ingest is one entry in `log.md` and one git commit, so you can see what a source changed and roll it back.
+
+**Read in Obsidian.** Open the vault folder as an Obsidian vault. `index.md` lists every page, and the Overview page is the front door. The block at the top of each page says who wrote it, which sources it rests on and when it goes stale. Numbers and quotes carry footnotes to the source they came from. Where two sources disagree, the page keeps both claims under a Status block instead of picking one. Links to pages that do not exist yet are normal. Claude leaves them where a page would help but no source justifies one so far. When several pages want the same missing page, lint offers to create it.
+
+**Ask questions.** Ask anything the sources might answer. Claude answers from the wiki pages, links every page it used, and tells you how many of those pages you have checked yourself. If the pages are thin, it reads the raw sources directly and says so. At the end it offers to file the answer. Say yes when the answer is worth keeping. It becomes a page under `wiki/analyses/`, and the next question can build on it.
+
+**Tidy up.** Every so often, run lint. The scripts fix what has one correct answer: the index, link typos, field order. Claude then reads the pages and lists what needs your judgement, such as two pages that contradict each other, a claim a newer source has overtaken, or a topic mentioned without a link to its page. What it cannot settle it writes as a dated bullet into the Open questions section of the Overview page. Each Claude Code session in the vault starts with a short status: recent log entries, page counts, how many ingests since the last lint, stale pages and the most wanted pages. When the ingest count is high, lint.
+
+**Review a page.** When you have read a page against its sources and it holds, verify it. Your name and the date go into the page. Only you can do this. Claude cannot mark a page verified, so "verified" always means a person looked. Query then counts that page as checked. If a later source changes the page, lint flags the review as outdated and you look again.
+
+**When Claude gets stopped.** Now and then Claude will report that the plugin refused an action. That is the guard rails working. Claude cannot write into `raw/`, cannot touch the verified block, cannot remove a source from a page's list, and cannot end a turn while wiki changes sit unlogged. If a source file really needs changing, edit it yourself in Obsidian or your editor. The guard only stops Claude.
 
 ## What's in the box
 
