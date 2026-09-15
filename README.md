@@ -77,7 +77,7 @@ Day to day, the work is a loop: collect, ingest, read, ask, tidy, review. Most d
 
 **Review a page.** When you have read a page against its sources and it holds, verify it. Your name and the date go into the page. Only you can do this. Claude cannot mark a page verified, so "verified" always means a person looked. Query then counts that page as checked. If a later source changes the page, lint flags the review as outdated and you look again.
 
-**When Claude gets stopped.** Now and then Claude will report that the plugin refused an action. That is the guard rails working. Claude cannot write into `raw/`, cannot touch the verified block, cannot remove a source from a page's list, and cannot end a turn while wiki changes sit unlogged. If a source file really needs changing, edit it yourself in Obsidian or your editor. The guard only stops Claude.
+**When Claude gets stopped.** Now and then Claude will report that the plugin refused an action. That is the guard rails working. Claude cannot write into `raw/`, cannot touch the verified block, cannot remove a source from a page's list, and cannot end a turn while wiki changes sit unlogged. The same applies through the shell: an in-place edit of a page with `sed`, a redirection into one, an inline `python3 -c` are all refused, so every page write goes through a path the guards can read. Deleting or moving a whole page is not refused, because that is a legitimate act and git records it. If a source file really needs changing, edit it yourself in Obsidian or your editor. The guard only stops Claude.
 
 ## What's in the box
 
@@ -90,9 +90,9 @@ Day to day, the work is a loop: collect, ingest, read, ask, tidy, review. Most d
 | Skill | `lint` | Structural fixes by script, semantic findings by Claude, filed as open questions |
 | Skill | `verify` | Record your review of a page |
 | Hook | SessionStart | Shows recent log entries, page counts, stale pages and most-wanted pages |
-| Hook | PreToolUse | Blocks writes into `raw/`, changes to `verified`, and shrinking a page's sources |
+| Hook | PreToolUse | Blocks writes into `raw/`, in-place shell edits of pages, changes to `verified`, and shrinking a page's sources |
 | Hook | PostToolUse | Warns about invalid frontmatter, removed headings and links that look like typos |
-| Hook | Stop | Refuses to end a turn with unlogged wiki changes or a new page nobody links to |
+| Hook | Stop | Refuses to end a turn with unlogged wiki changes or a new page nobody links to, every turn |
 
 ## The example wiki
 

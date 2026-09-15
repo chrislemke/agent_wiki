@@ -123,7 +123,10 @@ footnote resolves and every definition is used.
 the `verify` skill (a plugin script) or by a human editing the file. The skill
 is user-invoked, so the model cannot decide on its own that the owner reviewed
 a page. A hook denies any write from the LLM that changes `verified`, falling
-back to a textual comparison when the written frontmatter does not even parse. Approving an ingest plan
+back to a textual comparison when the written frontmatter does not even parse.
+That covers the file tools and, because in-place Bash writes into `wiki/` are
+denied outright, the shell as well: every page write reaches a path the guard
+can read. Approving an ingest plan
 is not reading the page, so it does not verify anything. Lint flags a page
 whose `generated.at` is later than its last `verified.at` as "review outdated";
 OKF treats the two as independent, which is precisely the hazard.
@@ -256,13 +259,22 @@ silent outside a vault:
   lint, stale pages and the most wanted pages.
 - PreToolUse denies writes into `raw/` from Write, Edit, MultiEdit and from
   write-like Bash commands (in-place sed, mv, cp, rm, tee, redirections, inline
-  interpreters), with the plugin's fetch and verify scripts allowlisted and
-  `raw/SOURCES.md` exempt, since it is a list of sources rather than a source.
-  It also denies writes that change `verified` or shrink `sources`.
-- PostToolUse warns on invalid frontmatter, removed top-level headings and
-  near-miss link targets. It never undoes a write.
-- Stop blocks once when wiki files changed without a log entry, or when a page
-  created in the session has no inbound link.
+  interpreters), with the plugin's fetch, verify and scaffold scripts
+  allowlisted and `raw/SOURCES.md` exempt, since it is a list of sources rather
+  than a source. The same pattern list guards `wiki/`, minus `rm`, `mv` and the
+  git write verbs: an in-place shell edit would slip past the `verified` and
+  `sources` guards, while deleting or moving a whole page is legitimate and
+  visible in git. A shell already sitting inside a layer is judged by the
+  event's `cwd`, not only by a `cd` in the command, because the Bash tool's
+  working directory persists between calls. It also denies writes that change
+  `verified` or shrink `sources`.
+- PostToolUse warns on invalid frontmatter, frontmatter comments that
+  normalising would drop, removed top-level headings and near-miss link
+  targets. It never undoes a write.
+- Stop blocks once per turn's problem set when wiki files changed without a log
+  entry, or when a page created in the turn has no inbound link. Every Stop
+  that passes opens a fresh accounting window, so the gate judges each turn
+  rather than only the first one.
 
 **D37. Graded strictness.** Raw immutability, `verified` and `sources`
 shrinkage are hard denials. Everything else is a warning the model must answer.
@@ -302,7 +314,8 @@ because they cost little and remove a failure: the hook matchers include
 fourth group, `fixable`, for what `--fix` would change; extra subcommands
 (`frontmatter.py set`, `links.py inbound`, `fetch.py plan-url`,
 `scaffold.py render-claude-md`, one `lint.py <checker>` per checker); extra
-Bash deny patterns (`touch`, `install`, `dd`, `rsync`, `ln`, git write verbs,
+Bash deny patterns (`touch`, `install`, `dd`, `rsync`, `ln`, `find -delete`,
+`sort -o`, `shred`, `sponge`, `xargs`, heredoc interpreters, git write verbs,
 whole-layer `rm`/`mv` and `cd raw && ...`); footnotes anywhere in a sentence,
 not only at its end, bind that sentence's literals; the index links
 `[[Basename|Title]]` when the two differ; and the OKF specification joined the
