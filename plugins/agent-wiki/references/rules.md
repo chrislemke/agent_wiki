@@ -28,7 +28,7 @@ Existing pages are augmented, never rewritten, unless the owner asks for a rewri
 
 - Keep every existing heading, in its order. Add bullets, sentences and new sections; do not delete or reword what is there.
 - `sources` only grows. Append `{id, page}` entries; never remove one.
-- `verified` stays exactly as it is on disk. Only the owner, through `/agent-wiki:verify` or their own editor, changes it; the write guard denies everything else.
+- `verified` stays exactly as it is on disk. Only the owner, through `/agent-wiki:verify` or their own editor, changes it; the write guard denies every edit to it, and the Bash guard denies `verify.py` to you, so the owner runs that line themselves.
 - A changed claim gets a Status block beneath it; the old text stays.
 - Refresh `generated.at` (with `frontmatter.py stamp`) only when the knowledge changed, not for formatting.
 - One link per concept mention per section: link the first mention in a section, write the plain name afterwards.

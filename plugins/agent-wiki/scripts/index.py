@@ -2,7 +2,9 @@
 """Index builder: regenerate the root index and one index per type folder from frontmatter.
 
 The root index keeps a protected curated block, delimited by
-<!-- agent-wiki:curated --> ... <!-- /agent-wiki:curated -->, verbatim. It is followed by
+<!-- agent-wiki:curated --> ... <!-- /agent-wiki:curated -->, verbatim. When the markers
+have been lost, whatever a person left between `# Index` and the first generated section
+is recovered into a fresh block rather than silently overwritten. It is followed by
 one section per page type in a fixed order, entries alphabetical by title as
 `- [[Basename]] — description`; source entries add their published date. Pages with
 unparseable frontmatter are listed under "Needs attention" rather than dropped.
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -76,11 +79,43 @@ def collect(root: Path) -> Tuple[Dict[str, List[Tuple[str, str]]], List[Tuple[st
     return sections, problems
 
 
+GENERATED_SECTION_RE = re.compile(
+    r"^## (?:" + "|".join(re.escape(t) for t in SECTION_TITLES.values()) + r") \(\d+\)$"
+    r"|^## Needs attention$"
+)
+
+
+def _recovered_block(existing: str) -> str:
+    """Hand-written content left in a root index whose curated markers are gone.
+
+    The file is generated, so overwriting it is expected, but nothing a person typed should
+    vanish without trace: everything between `# Index` and the first generated section is
+    kept and re-wrapped in markers, so the next build protects it again.
+    """
+    lines = existing.split("\n")
+    start = 0
+    for i, line in enumerate(lines):
+        if line.strip() == "# Index":
+            start = i + 1
+            break
+    kept: List[str] = []
+    for line in lines[start:]:
+        if GENERATED_SECTION_RE.match(line.strip()):
+            break
+        if line.strip() in (CURATED_OPEN, CURATED_CLOSE):
+            continue  # a half-deleted marker pair
+        kept.append(line)
+    return "\n".join(kept).strip("\n")
+
+
 def _curated_block(existing: str) -> str:
     start = existing.find(CURATED_OPEN)
     end = existing.find(CURATED_CLOSE)
     if start >= 0 and end > start:
         return existing[start : end + len(CURATED_CLOSE)]
+    recovered = _recovered_block(existing)
+    if recovered:
+        return f"{CURATED_OPEN}\n{recovered}\n{CURATED_CLOSE}"
     return f"{CURATED_OPEN}\n## Start here\n\n{CURATED_CLOSE}"
 
 

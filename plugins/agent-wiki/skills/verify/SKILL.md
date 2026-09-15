@@ -7,7 +7,7 @@ argument-hint: "<page title or path>"
 
 # Verify a page
 
-Record a human review in the page's `verified` list. Only the owner invokes this skill; the file-tool guard denies every other edit to `verified`, so "human-reviewed" keeps meaning a human reviewed it. Scripts live in `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+Record a human review in the page's `verified` list. Only the owner invokes this skill, and only the owner runs the script that stamps the page: the file-tool guard denies every edit to `verified`, and the Bash guard denies `verify.py` itself, so "human-reviewed" keeps meaning a human reviewed it. Claude prepares the review and hands the owner one line to run. Scripts live in `${CLAUDE_PLUGIN_ROOT}/scripts/`.
 
 ## Steps
 
@@ -17,13 +17,15 @@ Record a human review in the page's `verified` list. Only the owner invokes this
 
 3. **Who.** `human_id` from `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/vault.py settings --json`; if it is absent or the placeholder `owner`, use `git config user.name` lower-cased with dashes.
 
-4. **Record.**
+4. **Hand the command to the owner.** The Bash guard denies `verify.py`, by design: running it is the owner's act, not Claude's. Resolve the plugin path first with `echo "${CLAUDE_PLUGIN_ROOT}"` so the line carries no variables, then print exactly one line for the owner to paste, `!` included:
 
    ```
-   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/verify.py <page> --by <human_id>
+   ! python3 /absolute/path/to/plugin/scripts/verify.py "<page>" --by <human_id>
    ```
 
-   The script appends `{by: human:<id>, at: today}` and changes nothing else.
+   Say that the `!` runs it in this session as them, and that a plain terminal in the vault folder works just as well. Wait for it. The script appends `{by: human:<id>, at: today}` and changes nothing else. Do not run it yourself and do not reach the same result another way; every other route is denied.
+
+   Then confirm the stamp landed: `rg -n "human:<human_id>" "<page>"`. If it did not, stop and say so instead of logging a review that did not happen.
 
 5. **Log and commit.**
 

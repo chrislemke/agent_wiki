@@ -1,5 +1,5 @@
 {
-  "description": "Write-like shell operations whose target is inside the raw folder, or the folder itself. Each pattern is a Python regular expression matched against one pipeline segment; the token RAW expands to raw_target (a path ending in raw or raw/). After a segment that changes into raw/ (cd_into_raw), the following segments are matched with RAW removed, so any write there is denied. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. Extend this list rather than the hook code.",
+  "description": "Write-like shell operations whose target is inside the raw folder, or the folder itself, plus the few scripts Bash must not run. Each pattern is a Python regular expression matched against one pipeline segment; the token RAW expands to raw_target (a path ending in raw or raw/). Every raw rule must carry the RAW token: after a segment that changes into raw/ (cd_into_raw), the following segments are matched with RAW removed, so any write there is denied, and a rule that hardcodes raw/ instead would be unreachable after a cd. A rule with no RAW token (the verify script) matches everywhere. `reason` overrides the default denial message. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. Extend this list rather than the hook code.",
   "deny": [
     {
       "name": "sed in place",
@@ -35,11 +35,23 @@
     },
     {
       "name": "redirection",
-      "pattern": ">>?\\s*[\"']?(?:[^\\s\"'|;&]*/)?raw/"
+      "pattern": ">>?\\|?\\s*[\"']?(?!&)RAW"
     },
     {
       "name": "inline interpreter",
-      "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*raw/"
+      "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*RAW"
+    },
+    {
+      "name": "downloader",
+      "pattern": "\\b(?:curl|wget|trafilatura|httpie|http|aria2c)\\b[^|;&]*\\s-(?:o|O|-output)\\b[^|;&]*RAW"
+    },
+    {
+      "name": "find delete",
+      "pattern": "\\bfind\\s+[^|;&]*RAW[^|;&]*(?:-delete|-exec)"
+    },
+    {
+      "name": "dir and mode",
+      "pattern": "\\b(?:mkdir|rmdir|chmod|chown|chflags|xattr)\\s+[^|;&]*RAW"
     },
     {
       "name": "install or dd",
@@ -48,18 +60,19 @@
     {
       "name": "git write verbs",
       "pattern": "\\bgit\\s+(?:checkout|restore|clean|reset|rm|mv|stash)\\b[^|;&]*RAW"
+    },
+    {
+      "name": "verify script",
+      "pattern": "^\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*[\"']?\\S*/scripts/verify\\.py\\b|\\b(?:python[0-9.]*|uvx?|sh|bash|zsh|env)\\s+[^|;&]*/scripts/verify\\.py\\b",
+      "reason": "running verify.py is blocked: `verified` records that a person read the page against its sources, so only the owner runs the script. Ask the owner to run it themselves, exactly as printed, with `! python3 <plugin>/scripts/verify.py \"<page>\" --by <id>`."
     }
   ],
   "allow": [
     {
       "name": "plugin fetch script",
       "pattern": "/scripts/fetch\\.py\\b"
-    },
-    {
-      "name": "plugin verify script",
-      "pattern": "/scripts/verify\\.py\\b"
     }
   ],
   "raw_target": "(?:[^\\s\"'|;&]*/)?raw(?:/|(?=[\\s\"'|;&)]|$))",
-  "cd_into_raw": "\\bcd\\s+(?:-\\S+\\s+)*RAW"
+  "cd_into_raw": "\\b(?:cd|pushd)\\s+(?:-\\S+\\s+)*[\"']?RAW"
 }

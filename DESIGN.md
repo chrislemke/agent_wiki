@@ -256,13 +256,16 @@ silent outside a vault:
   lint, stale pages and the most wanted pages.
 - PreToolUse denies writes into `raw/` from Write, Edit, MultiEdit and from
   write-like Bash commands (in-place sed, mv, cp, rm, tee, redirections, inline
-  interpreters), with the plugin's fetch and verify scripts allowlisted and
-  `raw/SOURCES.md` exempt, since it is a list of sources rather than a source.
-  It also denies writes that change `verified` or shrink `sources`.
+  interpreters, downloaders, `find -delete`, directory and mode changes), with
+  the plugin's fetch script allowlisted and `raw/SOURCES.md` exempt, since it is
+  a list of sources rather than a source. Every raw rule is written against the
+  RAW token, so it still fires after a `cd` into the folder. It also denies
+  writes that change `verified` or shrink `sources`, and denies `verify.py`
+  itself: stamping a human review is the owner's own act.
 - PostToolUse warns on invalid frontmatter, removed top-level headings and
   near-miss link targets. It never undoes a write.
-- Stop blocks once when wiki files changed without a log entry, or when a page
-  created in the session has no inbound link.
+- Stop blocks once when a wiki page changed that no new log entry names, or when
+  a page created in the session has no inbound link.
 
 **D37. Graded strictness.** Raw immutability, `verified` and `sources`
 shrinkage are hard denials. Everything else is a warning the model must answer.

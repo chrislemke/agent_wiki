@@ -139,3 +139,68 @@ def test_literals_that_could_live_in_a_restorable_missing_raw_are_not_suspects(v
     # 77,777 is footnoted to a present source and is a real suspect
     assert [s["value"] for s in data["suspects"]] == ["77,777"]
     assert data["restore"] and data["errors"] == []
+
+
+# ------------------------------------------------------------------ publisher typography
+
+RAW_TYPO = """---
+title: Typography Report
+resource: https://example.com/typo
+fetched: 2026-09-01
+---
+
+# Typography Report
+
+The roaster said “We don’t chase the 18–22% window any more.”
+She called it a «careful, slow process» that runs 40–50 minutes—no shortcuts…
+The café in München roasts on site.
+Some long words are soft­hyphenated across a line.
+"""
+
+
+def typo_setup(vault: Path) -> None:
+    (vault / "raw/Typography Report.md").write_text(RAW_TYPO, encoding="utf-8")
+    (vault / "wiki/sources/Typography Report.md").write_text(source_page("Typography Report", "Typography Report.md", "typo"), encoding="utf-8")
+
+
+def typo_page(vault: Path, body: str) -> Path:
+    path = vault / "wiki/entities/Roasting.md"
+    path.write_text(entity("Roasting", body, [("typo", "Typography Report")]), encoding="utf-8")
+    return path
+
+
+TYPOGRAPHY_CASES = [
+    ("curly double quotes", '"We don\'t chase the 18-22% window any more."[^typo]'),
+    ("curly apostrophe", '"We don’t chase the 18-22% window any more."[^typo]'),
+    ("en dash as hyphen", '"We don\'t chase the 18-22% window any more."[^typo]'),
+    ("em dash as hyphen", '"that runs 40-50 minutes-no shortcuts"[^typo] is what she said.'),
+    ("ellipsis spelled out", '"runs 40-50 minutes-no shortcuts..."[^typo]'),
+    ("guillemets as quotes", '"careful, slow process"[^typo] is how she put it, over 15 characters.'),
+    ("decomposed accent", '"The café in München roasts on site."[^typo]'),
+    ("soft hyphen dropped", '"Some long words are softhyphenated across a line."[^typo]'),
+]
+
+
+def test_publisher_typography_is_not_reported_as_fabrication(vault: Path):
+    """A page that retypes a quote with an ASCII keyboard is quoting, not inventing."""
+    typo_setup(vault)
+    for name, line in TYPOGRAPHY_CASES:
+        page_path = typo_page(vault, f"## Quotes\n{line}\n\n[^typo]: Typography Report\n")
+        r = run_script("evidence.py", "check", str(page_path), "--json")
+        assert r.json()["suspects"] == [], (name, r.out)
+
+
+def test_a_folded_comparison_still_catches_a_doctored_quote(vault: Path):
+    typo_setup(vault)
+    body = (
+        "## Quotes\n"
+        '"We do chase the 18-22% window any more."[^typo]\n'
+        '"We don\'t chase the 25-30% window any more."[^typo]\n\n'
+        "[^typo]: Typography Report\n"
+    )
+    page_path = typo_page(vault, body)
+    r = run_script("evidence.py", "check", str(page_path), "--json")
+    values = [s["value"] for s in r.json()["suspects"]]
+    assert "We do chase the 18-22% window any more" in values, r.out
+    assert "We don't chase the 25-30% window any more" in values, r.out
+    assert "30%" in values  # the invented number is caught on its own too

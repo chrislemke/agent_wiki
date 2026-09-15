@@ -4,8 +4,8 @@
 File tools (Write, Edit, MultiEdit, NotebookEdit): deny any path inside raw/. For pages
 inside wiki/, compute the post-write frontmatter and deny when `verified` differs from
 disk or `sources` loses an entry. Snapshot the file's headings into session state.
-Bash: deny write-like commands whose target is inside raw/ (patterns in
-bash_patterns.json), unless the command invokes an allowlisted plugin script.
+Bash: deny write-like commands whose target is inside raw/, and calls to verify.py
+(patterns in bash_patterns.json), unless the command invokes an allowlisted plugin script.
 Exit 0 always; denials are JSON on stdout. Silent outside a vault.
 """
 from __future__ import annotations
@@ -118,31 +118,47 @@ def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-SEGMENT_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||;|\||\n)\s*")
+# `>|` is zsh's clobber operator, not a pipe: splitting there would hide the redirection.
+SEGMENT_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||(?<!>)\||;|\n)\s*")
+RAW_TOKEN = "RAW"
+
+
+def _denial(rule: Dict[str, Any]) -> str:
+    return str(rule.get("reason") or
+               f"{rule['name']} targeting raw/ is blocked: raw/ is the immutable source layer. "
+               "Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner.")
 
 
 def guard_bash(root: Path, command: str) -> Optional[str]:
-    """Deny write-like operations on raw/. Each pipeline segment is judged on its own, so an
-    allowlisted plugin script never launders a chained command."""
+    """Deny write-like operations on raw/, and the scripts Bash must not run. Each pipeline
+    segment is judged on its own, so an allowlisted plugin script never launders a chained
+    command."""
     cfg = json.loads(PATTERNS.read_text(encoding="utf-8"))
     raw_target = cfg["raw_target"]
-    cd_into_raw = re.compile(cfg["cd_into_raw"].replace("RAW", raw_target))
+    cd_into_raw = re.compile(cfg["cd_into_raw"].replace(RAW_TOKEN, raw_target))
+    rules: List[Dict[str, Any]] = list(cfg.get("deny", []))
+    raw_rules = [r for r in rules if RAW_TOKEN in r["pattern"]]
+    # a rule with no RAW token is about the command itself, not about raw/: it is judged before
+    # the raw/SOURCES.md exemption, which only ever excuses a raw path.
+    global_rules = [r for r in rules if RAW_TOKEN not in r["pattern"]]
     inside_raw = False  # a previous segment changed into raw/: every write there counts
     for segment in SEGMENT_SPLIT_RE.split(command):
         if not segment.strip():
             continue
         if any(re.search(rule["pattern"], segment) for rule in cfg.get("allow", [])):
             continue
+        for rule in global_rules:
+            if re.search(rule["pattern"], segment):
+                return _denial(rule)
         # raw/SOURCES.md is the list of restorable sources, not a source: a segment whose only
         # raw/ mentions are that file passes.
         mentions = re.findall(r"raw/[^\s\"'|;&)]*", segment)
         if mentions and all(m.endswith(V.SOURCES_LIST) for m in mentions):
             continue
         target = "" if inside_raw else raw_target
-        for rule in cfg.get("deny", []):
-            if re.search(rule["pattern"].replace("RAW", target), segment):
-                return (f"{rule['name']} targeting raw/ is blocked: raw/ is the immutable source layer. "
-                        "Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner.")
+        for rule in raw_rules:
+            if re.search(rule["pattern"].replace(RAW_TOKEN, target), segment):
+                return _denial(rule)
         if cd_into_raw.search(segment):
             inside_raw = True
     return None
