@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""PostToolUse hook: warn about invalid frontmatter, vanished headings and near-miss links.
+"""PostToolUse hook: warn about invalid frontmatter, comments a rewrite would drop,
+vanished headings and near-miss links.
 
 Runs after Write, Edit, MultiEdit or NotebookEdit on a page inside wiki/. Records the
 page as touched (and as created when it did not exist before) in session state.
@@ -42,6 +43,11 @@ def main() -> int:
     for e in result["errors"]:
         warnings.append(f"{rel}: frontmatter: {e}")
     text = path.read_text(encoding="utf-8", errors="replace")
+    for lineno, kind in FM.dropped_comments(text):
+        if kind == "comment-line":
+            warnings.append(f"{rel}:{lineno}: frontmatter comment lines are dropped by normalize and lint --fix; put the note in the body.")
+        else:
+            warnings.append(f"{rel}:{lineno}: text after ' #' is a YAML comment and will be dropped; quote the whole value.")
     after = H.headings_of(text)
     for heading in before:
         if heading not in after:

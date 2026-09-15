@@ -1,65 +1,98 @@
 {
-  "description": "Write-like shell operations whose target is inside the raw folder, or the folder itself. Each pattern is a Python regular expression matched against one pipeline segment; the token RAW expands to raw_target (a path ending in raw or raw/). After a segment that changes into raw/ (cd_into_raw), the following segments are matched with RAW removed, so any write there is denied. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. Extend this list rather than the hook code.",
+  "description": "Write-like shell operations whose target is inside a guarded layer (raw/ or wiki/). Each deny pattern is a Python regular expression matched against one pipeline segment; TARGET expands to the layer's target regex. Segments are split on unquoted separators only, so a pattern may run to the end of its segment. After a segment that changes into the layer (cd_into), following segments are matched with TARGET removed, so any write there is denied; a cd anywhere else leaves the layer. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. A layer's `xargs` pattern names the writers that a pipeline may not feed into it; it mirrors that layer's deny rules minus its skip_rules. Extend this list rather than the hook code.",
   "deny": [
     {
       "name": "sed in place",
-      "pattern": "\\bsed\\s+(?:-[A-Za-z]*\\s+)*-[A-Za-z]*i[A-Za-z.]*(?:\\s+[^|;&]*)?RAW"
+      "pattern": "\\b(?:g|/usr/bin/)?sed\\s+(?:(?:-[A-Za-z]+|--[a-z-]+(?:=\\S*)?)\\s+)*(?:-[A-Za-z]*i[A-Za-z.]*|--in-place(?:=\\S*)?)(?:\\s+[^\\n]*)?TARGET"
     },
     {
       "name": "perl in place",
-      "pattern": "\\bperl\\s+[^|;&]*-[A-Za-z]*i[A-Za-z]*[^|;&]*RAW"
+      "pattern": "\\bperl\\s+[^\\n]*-[A-Za-z]*i[A-Za-z]*[^\\n]*TARGET"
     },
     {
       "name": "mv",
-      "pattern": "\\b(?:git\\s+)?mv\\s+[^|;&]*RAW"
+      "pattern": "\\b(?:git\\s+)?mv\\s+[^\\n]*TARGET"
     },
     {
-      "name": "cp into raw",
-      "pattern": "\\bcp\\s+(?:-\\S+\\s+)*\\S+\\s+[^|;&]*RAW"
+      "name": "cp into layer",
+      "pattern": "\\bcp\\s+(?:-\\S+\\s+)*\\S+\\s+[^\\n]*TARGET"
     },
     {
       "name": "rm",
-      "pattern": "\\b(?:git\\s+)?rm\\s+[^|;&]*RAW"
+      "pattern": "\\b(?:git\\s+)?rm\\s+[^\\n]*TARGET"
     },
     {
       "name": "tee",
-      "pattern": "\\btee\\s+(?:-\\S+\\s+)*[^|;&<]*RAW"
+      "pattern": "\\btee\\s+(?:-\\S+\\s+)*[^\\n<]*TARGET"
     },
     {
       "name": "truncate",
-      "pattern": "\\btruncate\\s+[^|;&]*RAW"
+      "pattern": "\\btruncate\\s+[^\\n]*TARGET"
     },
     {
       "name": "touch",
-      "pattern": "\\btouch\\s+[^|;&]*RAW"
+      "pattern": "\\btouch\\s+[^\\n]*TARGET"
     },
     {
       "name": "redirection",
-      "pattern": ">>?\\s*[\"']?(?:[^\\s\"'|;&]*/)?raw/"
+      "pattern": ">>?(?!&)\\s*[\"']?(?!/dev/)TARGET"
     },
     {
       "name": "inline interpreter",
-      "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*raw/"
+      "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*TARGET"
     },
     {
       "name": "install or dd",
-      "pattern": "\\b(?:install|dd|rsync|ln)\\s+[^|;&]*RAW"
+      "pattern": "\\b(?:install|dd|rsync|ln)\\s+[^\\n]*TARGET"
+    },
+    {
+      "name": "find with a destructive action",
+      "pattern": "\\bfind\\s+[^\\n]*TARGET[^\\n]*\\s-(?:delete\\b|(?:exec|execdir|ok|okdir)\\s+(?:rm|mv|cp|sed|perl|tee|truncate|shred|unlink|touch|chmod)\\b)"
+    },
+    {
+      "name": "other file writers",
+      "pattern": "\\b(?:sort\\s+(?:-\\S+\\s+)*-o|shred|unlink|rmdir|sponge)\\s+[^\\n]*TARGET"
     },
     {
       "name": "git write verbs",
-      "pattern": "\\bgit\\s+(?:checkout|restore|clean|reset|rm|mv|stash)\\b[^|;&]*RAW"
+      "pattern": "\\bgit\\s+(?:checkout|restore|clean|reset|rm|mv|stash)\\b[^\\n]*TARGET"
     }
   ],
-  "allow": [
-    {
-      "name": "plugin fetch script",
-      "pattern": "/scripts/fetch\\.py\\b"
+  "cd_into": "\\bcd\\s+(?:-\\S+\\s+)*TARGET",
+  "layers": {
+    "raw": {
+      "target": "(?<![A-Za-z0-9_.-])(?:[^\\s\"'|;&]*/)?raw(?:/|(?=[\\s\"'|;&)]|$))",
+      "mention": "raw/[^\\s\"'|;&)]*",
+      "allow": [
+        {
+          "name": "plugin fetch script",
+          "pattern": "/scripts/fetch\\.py\\b"
+        },
+        {
+          "name": "plugin verify script",
+          "pattern": "/scripts/verify\\.py\\b"
+        },
+        {
+          "name": "plugin scaffold script",
+          "pattern": "/scripts/scaffold\\.py\\b"
+        }
+      ],
+      "skip_rules": [],
+      "xargs": "\\bxargs\\b(?:\\s+-\\S+)*\\s+(?:rm|mv|cp|sed|perl|tee|truncate|shred|unlink|touch)\\b",
+      "reason": "{rule} targeting raw/ is blocked: raw/ is the immutable source layer. Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner."
     },
-    {
-      "name": "plugin verify script",
-      "pattern": "/scripts/verify\\.py\\b"
+    "wiki": {
+      "target": "(?<![A-Za-z0-9_.-])(?:[^\\s\"'|;&]*/)?wiki(?:/|(?=[\\s\"'|;&)]|$))",
+      "mention": "wiki/[^\\s\"'|;&)]*",
+      "allow": [
+        {
+          "name": "plugin page scripts",
+          "pattern": "/scripts/(?:frontmatter|index|rename|lint|verify|scaffold)\\.py\\b"
+        }
+      ],
+      "skip_rules": ["mv", "rm", "git write verbs"],
+      "xargs": "\\bxargs\\b(?:\\s+-\\S+)*\\s+(?:cp|sed|perl|tee|truncate|shred|unlink|touch)\\b",
+      "reason": "{rule} targeting wiki/ is blocked: pages are written with the Write and Edit tools or the plugin scripts, so the verified and sources guards can check the result. Deleting or moving a whole page (rm, mv, rename.py) stays allowed."
     }
-  ],
-  "raw_target": "(?:[^\\s\"'|;&]*/)?raw(?:/|(?=[\\s\"'|;&)]|$))",
-  "cd_into_raw": "\\bcd\\s+(?:-\\S+\\s+)*RAW"
+  }
 }

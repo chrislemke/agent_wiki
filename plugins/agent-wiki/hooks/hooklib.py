@@ -2,8 +2,10 @@
 
 Session state is one JSON file per session id, kept outside the vault in the system
 temporary directory (override with AGENT_WIKI_STATE_DIR). It records pages created and
-touched this session, pre-write heading snapshots, the log hash when the session was
-first seen, and the signature of the last Stop block so the gate never loops.
+touched since the current accounting window opened, pre-write heading snapshots, the log
+hash the window opened with, and the signature of the last Stop block so the gate never
+loops. A window opens at SessionStart and again after every Stop that passes, so each
+Stop judges only the work done since the previous one.
 """
 from __future__ import annotations
 
@@ -126,6 +128,15 @@ class SessionState:
 
     def log_changed(self) -> bool:
         return (file_hash(self.root / "log.md") or "") != (self.data.get("log_hash_at_start") or "")
+
+    def reset_baseline(self) -> None:
+        """Open a fresh accounting window: the next Stop judges only what happens from now on."""
+        self.data["created"] = []
+        self.data["touched"] = []
+        self.data["existed"] = {}
+        self.data["headings"] = {}
+        self.data["log_hash_at_start"] = file_hash(self.root / "log.md") or ""
+        self.data["last_block_signature"] = None
 
     @property
     def touched(self) -> List[str]:

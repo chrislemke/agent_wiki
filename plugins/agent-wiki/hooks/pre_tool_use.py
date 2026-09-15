@@ -4,13 +4,16 @@
 File tools (Write, Edit, MultiEdit, NotebookEdit): deny any path inside raw/. For pages
 inside wiki/, compute the post-write frontmatter and deny when `verified` differs from
 disk or `sources` loses an entry. Snapshot the file's headings into session state.
-Bash: deny write-like commands whose target is inside raw/ (patterns in
-bash_patterns.json), unless the command invokes an allowlisted plugin script.
+Bash: deny write-like commands whose target is inside raw/ or inside wiki/ (patterns in
+bash_patterns.json), unless the command invokes an allowlisted plugin script. The wiki
+layer skips rm, mv and the git write verbs: deleting or moving a whole page is legitimate
+and visible in git, while an in-place edit would slip past the verified and sources guards.
 Exit 0 always; denials are JSON on stdout. Silent outside a vault.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -118,34 +121,94 @@ def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-SEGMENT_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||;|\||\n)\s*")
+HEREDOC_INTERPRETER_RE = re.compile(r"\b(?:python3?|node|ruby|perl)\s+(?:-\s+)?<<")
+CD_RE = re.compile(r"(?:^|\s)cd(?:\s|$)")
 
 
-def guard_bash(root: Path, command: str) -> Optional[str]:
-    """Deny write-like operations on raw/. Each pipeline segment is judged on its own, so an
-    allowlisted plugin script never launders a chained command."""
-    cfg = json.loads(PATTERNS.read_text(encoding="utf-8"))
-    raw_target = cfg["raw_target"]
-    cd_into_raw = re.compile(cfg["cd_into_raw"].replace("RAW", raw_target))
-    inside_raw = False  # a previous segment changed into raw/: every write there counts
-    for segment in SEGMENT_SPLIT_RE.split(command):
-        if not segment.strip():
+def split_segments(command: str) -> List[str]:
+    """Split a command line into pipeline segments, ignoring separators inside quotes.
+
+    A quoted `;` or `|` is an argument, not a separator. Splitting on one tears a command
+    away from its target and both halves then look harmless, which is how a sed script such
+    as `sed -i '' '/^verified:/,/^sources:/{...;}' page.md` used to slip past every rule.
+    """
+    segments: List[str] = []
+    buf: List[str] = []
+    quote: Optional[str] = None
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if quote is not None:
+            buf.append(ch)
+            quote = None if ch == quote else quote
+            i += 1
             continue
-        if any(re.search(rule["pattern"], segment) for rule in cfg.get("allow", [])):
+        if ch in "\"'":
+            quote = ch
+            buf.append(ch)
+        elif ch == "\\" and i + 1 < len(command):
+            buf.append(ch)
+            buf.append(command[i + 1])
+            i += 2
+            continue
+        elif command.startswith("&&", i) or command.startswith("||", i):
+            segments.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        elif ch in ";|\n":
+            segments.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+        i += 1
+    segments.append("".join(buf))
+    return [s.strip() for s in segments if s.strip()]
+
+
+def _guard_layer(cfg: Dict[str, Any], layer: Dict[str, Any], command: str, cwd_inside: bool, exempt_file: Optional[str]) -> Optional[str]:
+    """Deny write-like operations on one layer. Each pipeline segment is judged on its own, so an
+    allowlisted plugin script never launders a chained command."""
+    target = layer["target"]
+    cd_into = re.compile(cfg["cd_into"].replace("TARGET", target))
+    deny = [r for r in cfg["deny"] if r["name"] not in layer.get("skip_rules", [])]
+    xargs_writer = re.compile(layer["xargs"])
+    # A script fed on stdin is one program: judge the whole command, not its lines.
+    if HEREDOC_INTERPRETER_RE.search(command) and re.search(target, command):
+        return layer["reason"].format(rule="inline interpreter")
+    inside = cwd_inside  # the shell's cwd persists between Bash calls
+    upstream_mentions_target = False
+    for segment in split_segments(command):
+        if any(re.search(rule["pattern"], segment) for rule in layer.get("allow", [])):
             continue
         # raw/SOURCES.md is the list of restorable sources, not a source: a segment whose only
         # raw/ mentions are that file passes.
-        mentions = re.findall(r"raw/[^\s\"'|;&)]*", segment)
-        if mentions and all(m.endswith(V.SOURCES_LIST) for m in mentions):
-            continue
-        target = "" if inside_raw else raw_target
-        for rule in cfg.get("deny", []):
-            if re.search(rule["pattern"].replace("RAW", target), segment):
-                return (f"{rule['name']} targeting raw/ is blocked: raw/ is the immutable source layer. "
-                        "Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner.")
-        if cd_into_raw.search(segment):
-            inside_raw = True
+        if exempt_file:
+            mentions = re.findall(layer["mention"], segment)
+            if mentions and all(m.endswith(exempt_file) for m in mentions):
+                continue
+        if upstream_mentions_target and xargs_writer.search(segment):
+            return layer["reason"].format(rule="xargs")
+        effective = "" if inside else target
+        for rule in deny:
+            if re.search(rule["pattern"].replace("TARGET", effective), segment):
+                return layer["reason"].format(rule=rule["name"])
+        if re.search(target, segment):
+            upstream_mentions_target = True
+        if cd_into.search(segment):
+            inside = True
+        elif CD_RE.search(segment):
+            inside = False  # cd anywhere else leaves the layer (approximation)
     return None
+
+
+def guard_bash(root: Path, command: str, cwd: Path) -> Optional[str]:
+    """Deny write-like operations on raw/ and on wiki/, in that order."""
+    cfg = json.loads(PATTERNS.read_text(encoding="utf-8"))
+    reason = _guard_layer(cfg, cfg["layers"]["raw"], command, V.in_raw(root, cwd), V.SOURCES_LIST)
+    if reason:
+        return reason
+    return _guard_layer(cfg, cfg["layers"]["wiki"], command, V.in_wiki(root, cwd), None)
 
 
 def main() -> int:
@@ -157,7 +220,8 @@ def main() -> int:
     session_id = str(event.get("session_id") or "default")
     if tool == "Bash":
         command = str((event.get("tool_input") or {}).get("command") or "")
-        reason = guard_bash(root, command)
+        cwd = Path(str(event.get("cwd") or os.getcwd()))
+        reason = guard_bash(root, command, cwd)
         if reason:
             H.deny(reason)
         return 0

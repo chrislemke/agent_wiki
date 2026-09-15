@@ -85,6 +85,31 @@ def split_frontmatter(text: str) -> Tuple[Optional[List[str]], str]:
     raise FrontmatterError("unparseable frontmatter: opening --- without closing ---")
 
 
+COMMENT_LINE_RE = re.compile(r"^\s*#")
+PLAIN_WITH_HASH_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:\s+[^\"'\[{\s][^#]*\s#")
+
+
+def dropped_comments(text: str) -> List[Tuple[int, str]]:
+    """Frontmatter lines whose text a normalising rewrite would silently drop.
+
+    Returns (line number in the file, kind) pairs; kind is "comment-line" for a whole
+    comment line, "trailing" for text after ` #` in a plain scalar. Both are comments by
+    the YAML spec, so the parser is right to drop them: a caller about to rewrite the
+    file warns about the loss rather than causing it.
+    """
+    try:
+        fm_lines, _ = split_frontmatter(text)
+    except FrontmatterError:
+        return []
+    out: List[Tuple[int, str]] = []
+    for lineno, line in enumerate(fm_lines or [], start=2):
+        if COMMENT_LINE_RE.match(line):
+            out.append((lineno, "comment-line"))
+        elif PLAIN_WITH_HASH_RE.match(line):
+            out.append((lineno, "trailing"))
+    return out
+
+
 def _indent(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
 

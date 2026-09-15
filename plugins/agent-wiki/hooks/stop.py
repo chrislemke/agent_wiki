@@ -2,13 +2,15 @@
 """Stop hook: refuse to end the turn while wiki changes are unlogged or a new page is orphaned.
 
 Blocks with {"decision": "block", "reason": ...} when session state shows wiki pages
-touched but log.md unchanged since the session was first seen, or when a page created
-this session has zero inbound links. Blocks at most once per problem set, and never
-when stop_hook_active is set. Silent outside a vault.
+touched but log.md unchanged since the accounting window opened, or when a page created
+in the window has zero inbound links. Blocks at most once per problem set, and never
+when stop_hook_active is set. Every Stop that passes opens a fresh window, so the gate
+judges each turn's work rather than only the first one. Silent outside a vault.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import List
@@ -32,13 +34,16 @@ def main() -> int:
         return 0
     state = H.SessionState(session_id, root)
     problems: List[str] = []
-    touched = [t for t in state.touched if (root / t).is_file() or t in state.created]
+    # A page that no longer exists is no change to account for: a create-then-delete, or a
+    # revert, nets out and the message below tells the model exactly that.
+    touched = [t for t in state.touched if (root / t).is_file()]
     if touched and not state.log_changed():
+        plugin = os.environ.get("CLAUDE_PLUGIN_ROOT") or str(H.PLUGIN_ROOT)
         problems.append(
-            "wiki pages changed this session but log.md has no new entry: "
+            "wiki pages changed since the last logged stop but log.md has no new entry: "
             + ", ".join(touched[:8])
             + (" ..." if len(touched) > 8 else "")
-            + ". Append one with `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/log.py append --op <op> --title <title> --created/--updated ...`, or revert the changes."
+            + f". Append one with `python3 {plugin}/scripts/log.py append --op <op> --title <title> --created/--updated ...`, or revert the changes."
         )
     catalog = L.Catalog(root)
     orphans = []
@@ -56,13 +61,20 @@ def main() -> int:
             orphans.append(f"[[{page.stem}]]")
     if orphans:
         problems.append(
-            "page(s) created this session with no inbound link: " + ", ".join(orphans)
+            "page(s) created since the last logged stop with no inbound link: " + ", ".join(orphans)
             + ". Link each from a related page or the Overview, or delete it."
         )
     if not problems:
+        state.reset_baseline()
+        state.save()
         return 0
     signature = json.dumps(problems, sort_keys=True)
     if state.already_blocked_for(signature):
+        # Blocked once for exactly these problems and the model stopped anyway. Let it go
+        # (the gate never loops), but open a fresh window so the same pages are caught
+        # again the next time they change without a log entry.
+        state.reset_baseline()
+        state.save()
         return 0
     state.remember_block(signature)
     state.save()

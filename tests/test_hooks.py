@@ -81,6 +81,18 @@ def test_write_and_edit_into_raw_are_denied(tmp_path: Path, state_dir: Path):
     "touch raw/new.md",
     "git mv raw/a.md raw/b.md",
     "perl -pi -e 's/a/b/' raw/a.md",
+    # spellings the first pattern list missed (item 4)
+    "sed --in-place s/a/b/ raw/x.md",
+    "gsed -i s/a/b/ raw/x.md",
+    "python3 - <<EOF\nopen('raw/x.md','w').write('y')\nEOF",
+    "find raw -name '*.md' -delete",
+    "find raw -type f -exec rm {} +",
+    "sort -o raw/x.md raw/x.md",
+    "shred raw/x.md",
+    "unlink raw/x.md",
+    "rmdir raw/assets",
+    "echo x | sponge raw/x.md",
+    "find raw -name '*.md' | xargs rm",
 ])
 def test_write_like_bash_commands_targeting_raw_are_denied(tmp_path: Path, state_dir: Path, command: str):
     vault = copy_fixture("basic-vault", tmp_path / "v")
@@ -99,13 +111,44 @@ def test_write_like_bash_commands_targeting_raw_are_denied(tmp_path: Path, state
     f"python3 {PLUGIN}/scripts/fetch.py url https://example.com --vault .",
     f"python3 \"{PLUGIN}/scripts/verify.py\" wiki/entities/Obsidian.md --by chris",
     f"python3 {PLUGIN}/scripts/rawhash.py hash 'raw/Note Taking Guide.md'",
-    "echo hi > wiki/entities/Draft.md",
-    "sed -i '' 's/a/b/' wiki/entities/Obsidian.md",
+    # whole-page deletes and moves stay allowed: legitimate, visible in git, and they
+    # cannot forge a review on their own
+    "rm wiki/entities/Draft.md",
+    "mv wiki/entities/Draft.md wiki/entities/Other.md",
+    "git checkout -- wiki/entities/Obsidian.md",
+    f"python3 {PLUGIN}/scripts/frontmatter.py stamp wiki/entities/Obsidian.md --by agent-wiki/x",
+    f"python3 {PLUGIN}/scripts/rename.py rename wiki/entities/Obsidian.md 'Obsidian App'",
+    "rg -n verified wiki/",
+    "git -C . add -A -- . && git -C . commit -m 'ingest: x'",
+    # the xargs rule mirrors each layer's deny list: rm is skipped for wiki/, so is xargs rm
+    "rg -l --files-with-matches deprecated wiki/ | xargs rm",
 ])
 def test_read_only_and_allowlisted_commands_pass(tmp_path: Path, state_dir: Path, command: str):
     vault = copy_fixture("basic-vault", tmp_path / "v")
     r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
     assert r.code == 0 and decision(r) == "allow", (command, r)
+
+
+@pytest.mark.parametrize("command", [
+    "echo hi > wiki/entities/Draft.md",
+    "sed -i '' 's/a/b/' wiki/entities/Obsidian.md",
+    # the forgeries item 2 of IMPROVEMENTS.md reproduced: each one marks a page reviewed
+    # or drops a source without ever passing the file-tool guards
+    "sed -i '' 's/human:tester/human:claude/' wiki/entities/Obsidian.md",
+    "sed -i '' '/^verified:/,/^sources:/{/^sources:/!d;}' wiki/entities/Obsidian.md",
+    "python3 -c \"p='wiki/concepts/Wikilinks.md';t=open(p).read();open(p,'w').write(t.replace('sources:','verified:'))\"",
+    "printf -- '---\\ntype: entity\\n...verified:\\n---\\n' > wiki/entities/Obsidian.md",
+    "cat /tmp/forged.md > wiki/entities/Obsidian.md",
+    "tee wiki/entities/Obsidian.md < /tmp/forged.md",
+    "perl -pi -e 's/tester/claude/' wiki/entities/Obsidian.md",
+    "python3 - <<'EOF'\nopen('wiki/entities/Obsidian.md','w').write('forged')\nEOF",
+    "rg -l verified wiki/ | xargs sed -i '' s/tester/claude/",
+])
+def test_in_place_bash_writes_into_wiki_are_denied(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "deny", (command, r)
+    assert "wiki/" in json.loads(r.out)["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 # ------------------------------------------------------------------ trust and provenance guards
@@ -174,6 +217,22 @@ def test_invalid_frontmatter_and_near_miss_warn_but_clean_unresolved_link_is_sil
     assert r.code == 2 and "description" in r.err
 
 
+def test_frontmatter_comments_that_a_rewrite_would_drop_are_warned_about(tmp_path: Path, state_dir: Path):
+    """` #` opens a YAML comment in a plain scalar, so `title: Hooks #1` parses as `Hooks`
+    and normalising the page writes that back. Warn while the text is still there."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/entities/Hashes.md"
+    text = page("entity", "Hashes", body="Linked from [[Overview]].").replace(
+        "title: Hashes", "title: Hooks #1 and more\n# a comment line a human added")
+    r = post_write(vault, target, text, state_dir)
+    assert r.code == 2, r
+    assert "text after ' #'" in r.err and "comment lines are dropped" in r.err
+    # a quoted value carries the hash safely and says nothing
+    ok = vault / "wiki/entities/Quoted.md"
+    r = post_write(vault, ok, page("entity", "Quoted", description='"Use #tags in Obsidian"'), state_dir)
+    assert r.code == 0 and r.err == "", r
+
+
 # ------------------------------------------------------------------ the stop gate
 
 def test_stop_blocks_once_for_unlogged_wiki_changes_then_passes(tmp_path: Path, state_dir: Path):
@@ -184,12 +243,54 @@ def test_stop_blocks_once_for_unlogged_wiki_changes_then_passes(tmp_path: Path, 
     assert r.code == 0, r
     out = json.loads(r.out)
     assert out["decision"] == "block" and "log" in out["reason"].lower()
+    assert "${CLAUDE_PLUGIN_ROOT}" not in out["reason"], out["reason"]
+    assert "/scripts/log.py append" in out["reason"], out["reason"]
     # Claude Code re-invokes with the active flag: never trap the session
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=True), env=env_for(state_dir))
     assert r.code == 0 and r.out.strip() == ""
     # and the same unresolved problems do not block a second time
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.code == 0 and r.out.strip() == ""
+
+
+def test_stop_catches_a_second_unlogged_operation_in_the_same_session(tmp_path: Path, state_dir: Path):
+    """Every Stop that passes opens a fresh accounting window, so the gate judges each
+    turn's work rather than only the first one."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/entities/Obsidian.md"
+    post_write(vault, target, target.read_text(encoding="utf-8") + "\nFirst.\n", state_dir)
+    run_script("log.py", "append", "--op", "ingest", "--title", "First", "--vault", str(vault))
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert r.out.strip() == "", r
+    post_write(vault, target, target.read_text(encoding="utf-8") + "\nSecond.\n", state_dir)
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert json.loads(r.out)["decision"] == "block", r
+
+
+def test_the_same_problem_set_blocks_again_on_a_later_turn(tmp_path: Path, state_dir: Path):
+    """An ignored block lets the turn end, but it does not buy silence for the rest of the
+    session: the next turn that changes the same page unlogged is blocked again."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/entities/Obsidian.md"
+    post_write(vault, target, target.read_text(encoding="utf-8") + "\nOne.\n", state_dir)
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert json.loads(r.out)["decision"] == "block", r
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert r.out.strip() == "", r  # blocked once, then the model may stop anyway
+    post_write(vault, target, target.read_text(encoding="utf-8") + "\nTwo.\n", state_dir)
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert json.loads(r.out)["decision"] == "block", r
+
+
+def test_a_page_created_and_deleted_in_one_turn_needs_no_log_entry(tmp_path: Path, state_dir: Path):
+    """Net: nothing changed. Blocking here would contradict the block message's own advice
+    to revert the changes."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    scratch = vault / "wiki/entities/Scratch.md"
+    post_write(vault, scratch, page("entity", "Scratch", body="Linked from [[Overview]]."), state_dir)
+    scratch.unlink()
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert r.code == 0 and r.out.strip() == "", r
 
 
 def test_stop_passes_when_log_was_appended(tmp_path: Path, state_dir: Path):
@@ -305,6 +406,10 @@ def test_allowlisted_script_does_not_launder_a_chained_raw_write(tmp_path: Path,
     "git checkout -- 'raw/Note Taking Guide.md'",
     "git restore raw/x.md",
     "git clean -fd raw",
+    # the rules that hard-coded raw/ stopped matching once the token was blanked (item 3)
+    "cd raw && echo x > file.md",
+    "cd raw; cat ../a.md > x.md",
+    "cd raw && python3 -c \"open('x.md','w').write('y')\"",
 ])
 def test_whole_layer_and_git_writes_into_raw_are_denied(tmp_path: Path, state_dir: Path, command: str):
     vault = copy_fixture("basic-vault", tmp_path / "v")
@@ -312,14 +417,32 @@ def test_whole_layer_and_git_writes_into_raw_are_denied(tmp_path: Path, state_di
     assert decision(r) == "deny", (command, r)
 
 
+def test_a_shell_already_sitting_in_raw_cannot_write_there(tmp_path: Path, state_dir: Path):
+    """The Bash tool's working directory persists between calls, so the event's cwd, not
+    only a `cd` in the command, can put the shell inside the layer."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    event = {**bash_event(vault, "echo x > 'Note Taking Guide.md'"), "cwd": str(vault / "raw")}
+    r = run_hook("pre_tool_use.py", event, env=env_for(state_dir))
+    assert decision(r) == "deny", r
+    # reads from there are still fine
+    r = run_hook("pre_tool_use.py", {**bash_event(vault, "cat 'Note Taking Guide.md'"), "cwd": str(vault / "raw")}, env=env_for(state_dir))
+    assert decision(r) == "allow", r
+
+
 @pytest.mark.parametrize("command", [
     "ls raw",
     "cd raw && ls",
     "cd raw && cat x.md | head",
+    "cd raw && ls 2>/dev/null",
     "git status -- raw",
     "git log -- raw/x.md",
     "python3 scripts/rawhash.py hash raw/x.md",
     "echo raw > /tmp/note.txt",
+    # leaving the layer again restores ordinary judgement (item 3)
+    "cd raw && ls && cd .. && echo hi > /tmp/x.md",
+    # no left boundary meant these were denied although none touches the vault (item 5)
+    "cp x.md draw/",
+    "mv withdraw/ x/",
 ])
 def test_reads_of_the_raw_layer_stay_allowed(tmp_path: Path, state_dir: Path, command: str):
     vault = copy_fixture("basic-vault", tmp_path / "v")
