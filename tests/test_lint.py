@@ -93,6 +93,26 @@ def test_fix_applies_only_the_auto_fix_policy_and_leaves_raw_untouched(tmp_path:
     assert data2["auto_fixed"] == [] and data2["fixable"] == []
 
 
+def test_fix_refuses_to_normalise_a_page_whose_comments_it_would_drop(tmp_path: Path):
+    """Normalising is right by the YAML spec and still loses text the author may have meant
+    to keep, so lint reports it for a human instead of rewriting the page."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/concepts/Hashes.md"
+    target.write_text(
+        "---\ntitle: Hooks #1 and more\ntype: concept\ndescription: Use #tags in Obsidian\n"
+        "# a comment line a human added\ncreated: 2026-09-01\ngenerated: { by: x, at: 2026-09-01 }\n"
+        "---\n\n# Hashes\nSee [[Overview]].\n",
+        encoding="utf-8",
+    )
+    before = target.read_bytes()
+    code, data = findings(vault, "--fix")
+    assert code == 1
+    order = [f for f in data["judgement"] if f["type"] == "frontmatter-order" and f["page"].endswith("Hashes.md")]
+    assert order and "comments that normalising would drop" in order[0]["detail"], data
+    assert target.read_bytes() == before
+    assert not [f for f in data["auto_fixed"] if f["page"] and f["page"].endswith("Hashes.md")]
+
+
 def test_near_miss_with_two_candidates_needs_judgement(tmp_path: Path):
     vault = copy_fixture("basic-vault", tmp_path / "v")
     (vault / "wiki/entities/Obsidiam.md").write_text(page("entity", "Obsidiam", body="See [[Overview]]."), encoding="utf-8")

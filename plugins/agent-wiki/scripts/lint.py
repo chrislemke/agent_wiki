@@ -132,9 +132,17 @@ def check_frontmatter(ctx: Context) -> List[Finding]:
             out.append(finding("generated-missing", "judgement", rel, "generated missing; never invented by lint", "stamp the page with frontmatter.py stamp --by <actor> after confirming who wrote it"))
         for e in other:
             out.append(finding("frontmatter-invalid", "judgement", rel, e, "fix the field"))
-        canonical = FM.render(data, FM.parse_text(p.read_text(encoding="utf-8"))[1])
-        if canonical != p.read_text(encoding="utf-8") and not errors:
-            if ctx.fix:
+        text = p.read_text(encoding="utf-8")
+        canonical = FM.render(data, FM.parse_text(text)[1])
+        if canonical != text and not errors:
+            # Normalising drops YAML comments. Report rather than silently lose them.
+            lossy = FM.dropped_comments(text)
+            if lossy:
+                lines = ", ".join(f"line {n}" for n, _ in lossy)
+                out.append(finding("frontmatter-order", "judgement", rel,
+                                   f"frontmatter contains comments that normalising would drop ({lines})",
+                                   "quote values or move comments into the body, then run lint --fix"))
+            elif ctx.fix:
                 p.write_text(canonical, encoding="utf-8")
                 out.append(finding("frontmatter-order", "auto-fixed", rel, "frontmatter normalised to canonical key order", "none"))
             else:
