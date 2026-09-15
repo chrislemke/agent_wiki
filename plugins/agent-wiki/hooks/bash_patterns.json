@@ -1,5 +1,5 @@
 {
-  "description": "Write-like shell operations whose target is inside a guarded layer (raw/ or wiki/). Each deny pattern is a Python regular expression matched against one pipeline segment; TARGET expands to the layer's target regex. Segments are split on unquoted separators only, so a pattern may run to the end of its segment. After a segment that changes into the layer (cd_into), following segments are matched with TARGET removed, so any write there is denied; a cd anywhere else leaves the layer. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. A layer's `xargs` pattern names the writers that a pipeline may not feed into it; it mirrors that layer's deny rules minus its skip_rules. Extend this list rather than the hook code.",
+  "description": "Write-like shell operations whose target is inside a guarded layer (raw/ or wiki/). Each deny pattern is a Python regular expression matched against one pipeline segment; TARGET expands to the layer's target regex. Every layered rule must carry the TARGET token: after a segment that changes into the layer (cd_into), following segments are matched with TARGET removed, so any write there is denied, and a rule that hardcoded raw/ or wiki/ instead would be unreachable after a cd. Segments are split on unquoted separators only, so a pattern may run to the end of its segment. A cd anywhere else leaves the layer. Rules in `deny_always` carry no TARGET and are about the command itself rather than a layer, so they match everywhere and are judged before any exemption; `reason` overrides the layer's message. Read-only commands (cat, rg, grep, head, sed without -i, ls, wc, git status/log) never match. A layer's `xargs` pattern names the writers that a pipeline may not feed into it; it mirrors that layer's deny rules minus its skip_rules. Extend this list rather than the hook code.",
   "deny": [
     {
       "name": "sed in place",
@@ -35,11 +35,15 @@
     },
     {
       "name": "redirection",
-      "pattern": ">>?(?!&)\\s*[\"']?(?!/dev/)TARGET"
+      "pattern": ">>?\\|?(?!&)\\s*[\"']?(?!/dev/)TARGET"
     },
     {
       "name": "inline interpreter",
       "pattern": "\\b(?:python3?|node|ruby|perl)\\s+(?:-\\S+\\s+)*-[ce]\\s+.*TARGET"
+    },
+    {
+      "name": "downloader",
+      "pattern": "\\b(?:curl|wget|trafilatura|httpie|http|aria2c)\\b[^\\n]*\\s-(?:o|O|-output)\\b[^\\n]*TARGET"
     },
     {
       "name": "install or dd",
@@ -54,11 +58,22 @@
       "pattern": "\\b(?:sort\\s+(?:-\\S+\\s+)*-o|shred|unlink|rmdir|sponge)\\s+[^\\n]*TARGET"
     },
     {
+      "name": "dir and mode",
+      "pattern": "\\b(?:mkdir|chmod|chown|chflags|xattr)\\s+[^\\n]*TARGET"
+    },
+    {
       "name": "git write verbs",
       "pattern": "\\bgit\\s+(?:checkout|restore|clean|reset|rm|mv|stash)\\b[^\\n]*TARGET"
     }
   ],
-  "cd_into": "\\bcd\\s+(?:-\\S+\\s+)*TARGET",
+  "deny_always": [
+    {
+      "name": "verify script",
+      "pattern": "^\\s*(?:[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*[\"']?\\S*/scripts/verify\\.py\\b|\\b(?:python[0-9.]*|uvx?|sh|bash|zsh|env)\\s+[^\\n]*/scripts/verify\\.py\\b",
+      "reason": "running verify.py is blocked: `verified` records that a person read the page against its sources, so only the owner runs the script. Ask the owner to run it themselves, exactly as printed, with `! python3 <plugin>/scripts/verify.py \"<page>\" --by <id>`."
+    }
+  ],
+  "cd_into": "\\b(?:cd|pushd)\\s+(?:-\\S+\\s+)*[\"']?TARGET",
   "layers": {
     "raw": {
       "target": "(?<![A-Za-z0-9_.-])(?:[^\\s\"'|;&]*/)?raw(?:/|(?=[\\s\"'|;&)]|$))",
@@ -69,16 +84,12 @@
           "pattern": "/scripts/fetch\\.py\\b"
         },
         {
-          "name": "plugin verify script",
-          "pattern": "/scripts/verify\\.py\\b"
-        },
-        {
           "name": "plugin scaffold script",
           "pattern": "/scripts/scaffold\\.py\\b"
         }
       ],
       "skip_rules": [],
-      "xargs": "\\bxargs\\b(?:\\s+-\\S+)*\\s+(?:rm|mv|cp|sed|perl|tee|truncate|shred|unlink|touch)\\b",
+      "xargs": "\\bxargs\\b(?:\\s+-\\S+)*\\s+(?:rm|mv|cp|sed|perl|tee|truncate|shred|unlink|touch|chmod|mkdir)\\b",
       "reason": "{rule} targeting raw/ is blocked: raw/ is the immutable source layer. Read it freely (cat, rg, head, sed -n). To add a source use /agent-wiki:fetch; to change one, ask the owner."
     },
     "wiki": {
@@ -87,10 +98,10 @@
       "allow": [
         {
           "name": "plugin page scripts",
-          "pattern": "/scripts/(?:frontmatter|index|rename|lint|verify|scaffold)\\.py\\b"
+          "pattern": "/scripts/(?:frontmatter|index|rename|lint|scaffold)\\.py\\b"
         }
       ],
-      "skip_rules": ["mv", "rm", "git write verbs"],
+      "skip_rules": ["mv", "rm", "git write verbs", "dir and mode"],
       "xargs": "\\bxargs\\b(?:\\s+-\\S+)*\\s+(?:cp|sed|perl|tee|truncate|shred|unlink|touch)\\b",
       "reason": "{rule} targeting wiki/ is blocked: pages are written with the Write and Edit tools or the plugin scripts, so the verified and sources guards can check the result. Deleting or moving a whole page (rm, mv, rename.py) stays allowed."
     }

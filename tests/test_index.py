@@ -74,3 +74,41 @@ def test_build_links_by_basename_when_title_differs(vault: Path):
     (vault / "wiki/entities/Claude Code.md").write_text(page("entity", "Claude Code (CLI)", "Tool."), encoding="utf-8")
     run_script("index.py", "build", "--vault", str(vault))
     assert "- [[Claude Code|Claude Code (CLI)]] — Tool." in (vault / "index.md").read_text(encoding="utf-8")
+
+
+def test_a_lost_curated_block_is_recovered_not_discarded(vault: Path):
+    """Deleting the two marker lines used to drop everything a person had typed."""
+    setup(vault)
+    stripped = CURATED.replace("<!-- agent-wiki:curated -->\n", "").replace("<!-- /agent-wiki:curated -->\n", "")
+    (vault / "index.md").write_text(stripped, encoding="utf-8")
+    r = run_script("index.py", "build", "--vault", str(vault))
+    assert r.code == 0, r
+    text = (vault / "index.md").read_text(encoding="utf-8")
+    assert "Read [[Overview]] first. Hand-written, never regenerated." in text
+    assert "## Start here" in text
+    # the markers are restored, so the next build protects the block again
+    assert "<!-- agent-wiki:curated -->" in text and "<!-- /agent-wiki:curated -->" in text
+    # without markers nothing distinguishes a person's section from a stale one, so everything
+    # above the first generated section is kept; keeping too much beats deleting in silence
+    head, _, rest = text.partition("<!-- /agent-wiki:curated -->")
+    assert "[[Gone]]" in head and "## Syntheses (1)" in rest
+    before = text
+    assert run_script("index.py", "build", "--vault", str(vault)).code == 0
+    assert (vault / "index.md").read_text(encoding="utf-8") == before
+
+
+def test_half_a_marker_pair_also_recovers(vault: Path):
+    setup(vault)
+    (vault / "index.md").write_text(CURATED.replace("<!-- /agent-wiki:curated -->\n", ""), encoding="utf-8")
+    assert run_script("index.py", "build", "--vault", str(vault)).code == 0
+    text = (vault / "index.md").read_text(encoding="utf-8")
+    assert "Read [[Overview]] first. Hand-written, never regenerated." in text
+    assert text.count("<!-- agent-wiki:curated -->") == 1 and text.count("<!-- /agent-wiki:curated -->") == 1
+
+
+def test_an_index_with_no_curated_content_gets_the_default_block(vault: Path):
+    setup(vault)
+    (vault / "index.md").write_text("# Index\n", encoding="utf-8")
+    assert run_script("index.py", "build", "--vault", str(vault)).code == 0
+    text = (vault / "index.md").read_text(encoding="utf-8")
+    assert "<!-- agent-wiki:curated -->\n## Start here\n\n<!-- /agent-wiki:curated -->" in text

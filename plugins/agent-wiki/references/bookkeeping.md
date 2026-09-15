@@ -23,14 +23,14 @@ All scripts live in `${CLAUDE_PLUGIN_ROOT}/scripts/` and run with `python3`. `${
 | Grounding check | `evidence.py check <page or vault> [--json]` |
 | All lint checks | `lint.py all [--vault V] [--scope <path>] [--fix] [--json]`; one checker: `lint.py <checker> [--vault V] [--json]` |
 | Fetch into raw | `fetch.py url <URL> [--stdin --fidelity summary --title T] [--json]`, `fetch.py github <repo URL> [--files A,B] [--json]`, `fetch.py restore [--json]`, `fetch.py plan-url <URL> [--json]` |
-| Record a human review | `verify.py <page> --by <human id> [--vault V] [--json]` |
+| Record a human review | `verify.py <page> --by <human id> [--vault V] [--json]` — the owner runs this one; the Bash guard denies it to you |
 | Scaffold a vault | `scaffold.py init --vault <dir> --answers answers.json --by agent-wiki/<model-id> [--json]`; `scaffold.py render-claude-md --answers answers.json` |
 
 `--created` and `--updated` take one or more page titles after the flag and may be repeated. Titles are written bare or as `[[Title]]`; the log gets `[[Title]]`.
 
 ## Actor
 
-`generated.by` is `agent-wiki/<model-id>`, with the exact model id you are running as (for example `agent-wiki/claude-fable-5-1`). Use `agent-wiki/claude` only when the id is unknown. Humans are `human:<id>` and are written only by `verify.py` or by the owner's own editor.
+`generated.by` is `agent-wiki/<model-id>`, with the exact model id you are running as (for example `agent-wiki/claude-fable-5-1`). Use `agent-wiki/claude` only when the id is unknown. Humans are `human:<id>` and are written only by `verify.py`, which only the owner runs, or by the owner's own editor.
 
 ## Write order for an ingest
 
@@ -46,7 +46,7 @@ One source at a time. Never compile two sources in parallel: index, log and casc
 
 ## Log and commit
 
-Log header `## [YYYY-MM-DD] <op> | <title>`, then `- Created:`, `- Updated:`, `- Note:` lines as needed. Operations: `init`, `fetch`, `ingest`, `ingest-failed`, `query`, `lint`, `verify`, `schema`. Titles: the source title for ingest; for fetch the source title, `<repo> README[ and <files>]` for a repository, or `restore: <N> sources`; the question for query; `<N> fixed, <M> proposed` for lint (a check-only run may use a short description such as `fresh clone acceptance`); the page title for verify; `generic block v<N>` for schema.
+Log header `## [YYYY-MM-DD] <op> | <title>`, then `- Created:`, `- Updated:`, `- Note:` lines as needed. Every wiki page you wrote this turn is named in `- Created:` or `- Updated:`; the end-of-turn gate checks the names, so an entry about another page does not cover them. Operations: `init`, `fetch`, `ingest`, `ingest-failed`, `query`, `lint`, `verify`, `schema`. Titles: the source title for ingest; for fetch the source title, `<repo> README[ and <files>]` for a repository, or `restore: <N> sources`; the question for query; `<N> fixed, <M> proposed` for lint (a check-only run may use a short description such as `fresh clone acceptance`); the page title for verify; `generic block v<N>` for schema.
 
 The commit message is `<op>: <title>`, the same words as the log header, no body needed, no attribution trailer. Every operation ends with both, an unfiled query included (its commit holds only the log entry). Run git against the vault root reported by `vault.py detect`, whatever the working directory:
 

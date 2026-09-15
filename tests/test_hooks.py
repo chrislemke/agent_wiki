@@ -109,8 +109,8 @@ def test_write_like_bash_commands_targeting_raw_are_denied(tmp_path: Path, state
     "grep -r users raw",
     "wc -l raw/*.md",
     f"python3 {PLUGIN}/scripts/fetch.py url https://example.com --vault .",
-    f"python3 \"{PLUGIN}/scripts/verify.py\" wiki/entities/Obsidian.md --by chris",
     f"python3 {PLUGIN}/scripts/rawhash.py hash 'raw/Note Taking Guide.md'",
+    f"cat {PLUGIN}/scripts/verify.py",  # reading the script is fine; running it is not
     # whole-page deletes and moves stay allowed: legitimate, visible in git, and they
     # cannot forge a review on their own
     "rm wiki/entities/Draft.md",
@@ -259,7 +259,7 @@ def test_stop_catches_a_second_unlogged_operation_in_the_same_session(tmp_path: 
     vault = copy_fixture("basic-vault", tmp_path / "v")
     target = vault / "wiki/entities/Obsidian.md"
     post_write(vault, target, target.read_text(encoding="utf-8") + "\nFirst.\n", state_dir)
-    run_script("log.py", "append", "--op", "ingest", "--title", "First", "--vault", str(vault))
+    run_script("log.py", "append", "--op", "ingest", "--title", "First", "--updated", "Obsidian", "--vault", str(vault))
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.out.strip() == "", r
     post_write(vault, target, target.read_text(encoding="utf-8") + "\nSecond.\n", state_dir)
@@ -293,26 +293,52 @@ def test_a_page_created_and_deleted_in_one_turn_needs_no_log_entry(tmp_path: Pat
     assert r.code == 0 and r.out.strip() == "", r
 
 
-def test_stop_passes_when_log_was_appended(tmp_path: Path, state_dir: Path):
+def test_stop_passes_when_the_log_entry_names_the_changed_page(tmp_path: Path, state_dir: Path):
     vault = copy_fixture("basic-vault", tmp_path / "v")
     target = vault / "wiki/entities/Obsidian.md"
     post_write(vault, target, target.read_text(encoding="utf-8") + "\nMore.\n", state_dir)
-    assert run_script("log.py", "append", "--op", "ingest", "--title", "More", "--vault", str(vault)).code == 0
+    assert run_script("log.py", "append", "--op", "ingest", "--title", "More", "--updated", "Obsidian", "--vault", str(vault)).code == 0
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.code == 0 and r.out.strip() == "", r
+
+
+def test_stop_is_not_satisfied_by_a_log_entry_about_another_page(tmp_path: Path, state_dir: Path):
+    """A log entry has to account for what changed; any entry at all used to be enough."""
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    target = vault / "wiki/entities/Obsidian.md"
+    post_write(vault, target, target.read_text(encoding="utf-8") + "\nMore.\n", state_dir)
+    run_script("log.py", "append", "--op", "query", "--title", "unrelated question", "--note", "not filed", "--vault", str(vault))
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    out = json.loads(r.out)
+    assert out["decision"] == "block" and "wiki/entities/Obsidian.md" in out["reason"]
+    # naming the page in a later entry opens the gate
+    run_script("log.py", "append", "--op", "ingest", "--title", "More", "--updated", "Obsidian", "--vault", str(vault))
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    assert r.out.strip() == "", r
+
+
+def test_stop_accepts_the_page_title_when_it_differs_from_the_basename(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    new = vault / "wiki/entities/Zettelkasten.md"
+    post_write(vault, new, page("entity", "The Zettelkasten Method", body="Linked from [[Overview]]."), state_dir)
+    run_script("log.py", "append", "--op", "ingest", "--title", "x", "--created", "The Zettelkasten Method", "--vault", str(vault))
+    r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
+    out = json.loads(r.out) if r.out.strip() else {"reason": ""}
+    assert "no new log entry names" not in out["reason"], r
 
 
 def test_stop_blocks_when_a_page_created_this_session_has_no_inbound_link(tmp_path: Path, state_dir: Path):
     vault = copy_fixture("basic-vault", tmp_path / "v")
     new = vault / "wiki/entities/Lonely.md"
     post_write(vault, new, page("entity", "Lonely", body="Links out to [[Overview]] only."), state_dir)
-    run_script("log.py", "append", "--op", "ingest", "--title", "Lonely", "--vault", str(vault))
+    run_script("log.py", "append", "--op", "ingest", "--title", "Lonely", "--created", "Lonely", "--vault", str(vault))
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     out = json.loads(r.out)
     assert out["decision"] == "block" and "Lonely" in out["reason"]
     # link it from the Overview and the gate opens
     overview = vault / "wiki/syntheses/Overview.md"
     post_write(vault, overview, overview.read_text(encoding="utf-8") + "\nSee [[Lonely]].\n", state_dir)
+    run_script("log.py", "append", "--op", "ingest", "--title", "Lonely", "--updated", "Overview", "--vault", str(vault))
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.out.strip() == "", r
 
@@ -384,7 +410,7 @@ def test_stop_does_not_treat_a_new_source_page_as_orphan(tmp_path: Path, state_d
     vault = copy_fixture("basic-vault", tmp_path / "v")
     new = vault / "wiki/sources/Thin Source.md"
     post_write(vault, new, page("source", "Thin Source", raw="raw/Thin.md", raw_sha="x", disposition="no-material", ingested="2026-09-02"), state_dir)
-    run_script("log.py", "append", "--op", "ingest", "--title", "Thin Source", "--vault", str(vault))
+    run_script("log.py", "append", "--op", "ingest", "--title", "Thin Source", "--created", "Thin Source", "--vault", str(vault))
     r = run_hook("stop.py", ev(vault, "Stop", stop_hook_active=False), env=env_for(state_dir))
     assert r.code == 0 and r.out.strip() == "", r
 
@@ -448,3 +474,109 @@ def test_reads_of_the_raw_layer_stay_allowed(tmp_path: Path, state_dir: Path, co
     vault = copy_fixture("basic-vault", tmp_path / "v")
     r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
     assert decision(r) == "allow", (command, r)
+
+
+# ------------------------------------------------------------------ raw guard: every rule after a cd
+
+# One command per deny rule that names raw only through the working directory. A rule whose
+# pattern hardcodes `raw/` instead of the TARGET token is unreachable here, which is how the
+# redirection and inline-interpreter blind spots survived.
+AFTER_CD = {
+    "sed in place": "sed -i '' s/a/b/ x.md",
+    "perl in place": "perl -pi -e 's/a/b/' x.md",
+    "mv": "mv a.md b.md",
+    "cp into layer": "cp /tmp/x.md a.md",
+    "rm": "rm a.md",
+    "tee": "tee a.md < /tmp/x",
+    "truncate": "truncate -s 0 a.md",
+    "touch": "touch a.md",
+    "redirection": "echo x > a.md",
+    "inline interpreter": "python3 -c \"open('a.md','w').write('x')\"",
+    "downloader": "curl https://x -o a.md",
+    "find with a destructive action": "find . -name '*.md' -delete",
+    "dir and mode": "mkdir sub",
+    "other file writers": "shred a.md",
+    "install or dd": "install /tmp/x a.md",
+    "git write verbs": "git checkout -- a.md",
+}
+PATTERNS = json.loads((PLUGIN / "hooks" / "bash_patterns.json").read_text(encoding="utf-8"))
+RAW_RULES = [r["name"] for r in PATTERNS["deny"] if "TARGET" in r["pattern"]]
+GLOBAL_RULES = [r["name"] for r in PATTERNS["deny_always"]]
+
+
+def test_every_raw_deny_rule_has_a_case_after_a_cd():
+    """A new raw rule must be exercised from inside raw/, or it may be unreachable there."""
+    assert sorted(RAW_RULES) == sorted(AFTER_CD)
+    assert [r["name"] for r in PATTERNS["deny"] if "TARGET" not in r["pattern"]] == []
+    assert GLOBAL_RULES == ["verify script"]  # the only rule that is not about a layer
+
+
+@pytest.mark.parametrize("rule", sorted(AFTER_CD))
+def test_every_deny_rule_still_fires_after_a_cd_into_raw(tmp_path: Path, state_dir: Path, rule: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    command = f"cd raw && {AFTER_CD[rule]}"
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "deny", (rule, command, r)
+
+
+@pytest.mark.parametrize("command", [
+    "curl https://x -o raw/a.md",
+    "curl -sL https://x --output raw/a.md",
+    "wget -O raw/a.md https://x",
+    "trafilatura -u https://x -o raw/a.md",
+    "find raw -name '*.md' -delete",
+    r"find raw -name '*.md' -exec rm {} \;",
+    "mkdir raw/sub",
+    "mkdir -p raw/sub/deep",
+    "rmdir raw/assets",
+    "chmod 000 raw/a.md",
+    "chown me raw/a.md",
+    "echo x >| raw/a.md",           # zsh clobber: the | is not a pipe
+    "cd \"raw\" && rm a.md",         # quoted cd target
+    "cd \"$PWD/raw\" && rm a.md",
+    "pushd raw && rm a.md",
+])
+def test_further_write_shapes_into_raw_are_denied(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "deny", (command, r)
+
+
+@pytest.mark.parametrize("command", [
+    "curl https://x -o /tmp/a.md",
+    "wget -O /tmp/notes.md https://x",
+    "find /tmp -name '*.md' -delete",
+    "cat raw/a.md > /tmp/copy.md",
+    "python3 script.py > out.log 2>&1",
+    "uvx trafilatura -u https://x --markdown",
+    # wiki/ skips `dir and mode`: a directory or a mode cannot forge a review or drop a source
+    "mkdir wiki/notes",
+    "chmod 644 wiki/entities/Obsidian.md",
+])
+def test_the_same_shapes_outside_the_guarded_layers_stay_allowed(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "allow", (command, r)
+
+
+# ------------------------------------------------------------------ verify.py is the owner's to run
+
+@pytest.mark.parametrize("command", [
+    f"python3 {PLUGIN}/scripts/verify.py 'wiki/entities/Obsidian.md' --by chris",
+    f"python3 \"{PLUGIN}/scripts/verify.py\" wiki/entities/Obsidian.md --by chris",
+    f"{PLUGIN}/scripts/verify.py wiki/entities/Obsidian.md --by chris",
+    f"uv run {PLUGIN}/scripts/verify.py wiki/entities/Obsidian.md --by chris",
+    f"cd /tmp && python3 {PLUGIN}/scripts/verify.py x.md --by chris",
+])
+def test_running_the_verify_script_from_bash_is_denied(tmp_path: Path, state_dir: Path, command: str):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+    assert decision(r) == "deny", (command, r)
+    assert "owner" in json.loads(r.out)["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def test_reading_the_verify_script_stays_allowed(tmp_path: Path, state_dir: Path):
+    vault = copy_fixture("basic-vault", tmp_path / "v")
+    for command in (f"cat {PLUGIN}/scripts/verify.py", f"rg -n 'def ' {PLUGIN}/scripts/verify.py"):
+        r = run_hook("pre_tool_use.py", bash_event(vault, command), env=env_for(state_dir))
+        assert decision(r) == "allow", (command, r)

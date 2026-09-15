@@ -7,7 +7,9 @@ blockquotes), ISO dates (YYYY-MM-DD, YYYY-MM) and specific numbers
 Frontmatter, fenced and inline code, Status blocks and footnote definitions are
 excluded. Resolution is two hops: sources[].page names a source page whose raw
 field names the file. A sentence ending in [^id] is checked only against that
-source; other sentences against all of the page's raws. Report-only.
+source; other sentences against all of the page's raws. Comparison folds typographic
+variants (curly quotes, dashes, ellipses, decomposed accents) on both sides, so publisher
+typography retyped in ASCII is not mistaken for fabrication. Report-only.
 
 Usage:
   evidence.py check PAGE|VAULT [--json]
@@ -20,6 +22,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -44,6 +47,26 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"(\[])")
 WS_RE = re.compile(r"\s+")
 MIN_QUOTE = 15
+
+
+# Publishers set quotes, dashes and ellipses as typography; a page that retypes the same
+# sentence with an ASCII keyboard is quoting faithfully, not fabricating. Both sides of every
+# comparison are folded to one spelling, and NFC composes decomposed accents. The page text
+# itself is never rewritten.
+_FOLD = {
+    "‘": "'", "’": "'", "‚": "'", "‛": "'", "′": "'",
+    "“": '"', "”": '"', "„": '"', "‟": '"', "″": '"',
+    "«": '"', "»": '"',
+    "‐": "-", "‑": "-", "‒": "-", "–": "-",
+    "—": "-", "―": "-", "−": "-",
+    "…": "...", "­": "",
+}
+_FOLD_TABLE = {ord(k): v for k, v in _FOLD.items()}
+
+
+def typofold(text: str) -> str:
+    """Fold typographic variants to their ASCII spelling, for comparison only."""
+    return unicodedata.normalize("NFC", text).translate(_FOLD_TABLE)
 
 
 def normalize(text: str) -> str:
@@ -164,6 +187,7 @@ def extract_candidates(body: str) -> List[Candidate]:
 
 
 def contains(haystack: str, kind: str, value: str) -> bool:
+    value = typofold(value)  # raw_body() folded the haystack; fold the needle the same way
     if kind == "quote":
         return value in haystack
     right = r"(?!-\d{2})" if kind == "date" and len(value) == 7 else ""
@@ -176,7 +200,7 @@ def raw_body(path: Path) -> str:
         _, body = FM.parse_text(path.read_text(encoding="utf-8", errors="replace"))
     except FM.FrontmatterError:
         body = path.read_text(encoding="utf-8", errors="replace")
-    return normalize(body)
+    return typofold(normalize(body))
 
 
 def restorable_sources(root: Path) -> Dict[str, Dict[str, str]]:

@@ -70,13 +70,17 @@ def add_verified(text: str, actor: str, date: str) -> str:
     return "---\n" + "\n".join(lines) + "\n---\n" + body
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="verify.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("page")
     parser.add_argument("--by", required=True, help="human id, e.g. chris or human:chris")
     parser.add_argument("--vault", default=None)
     parser.add_argument("--json", action="store_true")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
     path = Path(args.page)
     try:
         root = V.require_vault(args.vault or str(path))

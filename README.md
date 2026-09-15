@@ -4,15 +4,15 @@ A Claude Code plugin that turns a folder of sources into a wiki that Claude writ
 
 ## What is this?
 
-You collect sources: articles, papers, README files, meeting notes. Claude reads each one, works out what it adds, and writes or updates the wiki pages it touches. Pages link to each other, every number and quote points back to the source it came from, and disagreements between sources are marked on the page instead of being smoothed over. You browse the result in Obsidian and ask Claude questions against it. Good answers get filed back into the wiki, so it grows with every source and every question.
+You have a folder of documents. You read them once, and now you remember the gist and none of the detail. Every question you ask sends Claude back into the same files to read them again, and the answer that comes back is new each time. Nothing you worked out last week is there this week, and nothing tells you which sentence in which file the answer rests on.
 
-The plugin gives Claude six commands and four guard rails. The guard rails matter as much as the commands. Claude cannot edit a source file, cannot mark a page as reviewed by you, cannot drop a source from a page, and cannot end a turn with changes it did not log. Those are the mistakes an LLM makes when nobody is watching, and a hook catches each one.
+agent-wiki puts a wiki in between. You collect sources: articles, papers, README files, meeting notes. Claude reads each one, works out what it adds, and writes or updates the wiki pages it touches. Pages link to each other, every number and quote points back to the source it came from, and disagreements between sources are marked on the page instead of being smoothed over. You browse the result in Obsidian and ask Claude questions against it. Good answers get filed back into the wiki, so it grows with every source and every question.
 
-## Two ideas combined
+You could point Claude at the folder instead, and for a handful of files that is the better choice. The difference shows up later. A search gives you an answer. A wiki page gives you the answer, the sources under it, a note where a second source disagrees, a mark saying whether you have read it yourself, and a date after which nobody should trust it. None of that survives in a chat window.
 
-The workflow comes from Andrej Karpathy's [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) idea. Instead of searching raw documents every time you ask something, the LLM keeps a persistent wiki between you and the sources: it ingests, it answers with citations, and it periodically checks the wiki for contradictions and gaps. The wiki compounds. That gist is the first source in the example wiki.
+Reading a source in is the slow part: Claude reads the whole file, searches the whole wiki for what it touches, and waits for you to approve a plan. Asking is the cheap part. So this is worth the trouble when you will put many questions to the same material over months, and it is not worth it when you have five files and one question.
 
-The metadata comes from Google's [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) (OKF). Every page records who wrote it, who verified it, which sources it rests on, and when it goes stale, in a small set of frontmatter fields. Karpathy's pattern has no way to tell a page Claude wrote from a page you checked; OKF has no immutable source layer and no notion of two sources disagreeing. Each fills the other's gap, so this plugin uses both.
+The plugin gives Claude six commands and four guard rails. The guard rails matter as much as the commands. Claude cannot edit a source file, cannot mark a page as reviewed by you, cannot drop a source from a page, and is stopped at the end of a turn when it leaves changed pages out of the log. Those are the mistakes an LLM makes when nobody is watching, and a hook catches each one. What you get for that is a page you can still trust in six months without opening the sources again.
 
 ## How it works
 
@@ -24,6 +24,26 @@ A wiki is one folder, called a vault.
 - `index.md` is generated from the pages. `log.md` records every operation, and every operation is also one git commit with the same words.
 
 Small Python scripts do the deterministic work (parsing frontmatter, resolving links, rebuilding the index, checking that a quoted number really appears in the source). Claude does the reading, the writing and the judgement.
+
+## What it is good for
+
+It fits when sources pile up over time, when they disagree with each other, when they go out of date, and when you will ask about them again and again. That is what the machinery is for.
+
+- **A field that moves fast.** Model releases, framework documentation, vendor APIs. Half of what you save is wrong within a quarter, so pages carry a date after which they should be checked, and two sources disagreeing is the normal case rather than an exception.
+- **Watching a market or a competitor.** Nothing is authoritative and everything is second-hand, so who said it, and when, matters as much as what was said.
+- **A decision with many inputs.** Build or buy, which vendor, which architecture. Thirty documents over a few weeks, and at the end you have to explain the choice with the evidence still attached.
+- **Rules, standards and contracts.** Every number and every quote has to appear word for word in the file it came from, and a script checks that it does.
+- **The memory of a team or a system.** Design documents, meeting notes, postmortems. "Why did we decide this" is an answer spread across forty files that nobody will ever put back together by hand.
+- **A long piece of research.** Papers that contradict each other, and citations you need anyway.
+- **Something personal and serious.** An illness, a legal matter, buying a house. A closed subject, sources that conflict, and a year of questions ahead of you.
+
+It does not fit everywhere:
+
+- **Your own code.** The code is the truth and it changes faster than you can read it in. A `CLAUDE.md` and a search tool do the job better.
+- **A few files and one question.** Reading them in costs more than asking Claude to read them.
+- **News.** You want the latest thing, not the accumulated picture.
+- **A subject with no edges.** One vault holds one subject. A wiki about "AI" becomes a pile.
+- **Files that keep changing.** A page records a fingerprint of the file it came from, and a living document sets that off every time.
 
 ## Install
 
@@ -75,9 +95,11 @@ Day to day, the work is a loop: collect, ingest, read, ask, tidy, review. Most d
 
 **Tidy up.** Every so often, run lint. The scripts fix what has one correct answer: the index, link typos, field order. Claude then reads the pages and lists what needs your judgement, such as two pages that contradict each other, a claim a newer source has overtaken, or a topic mentioned without a link to its page. What it cannot settle it writes as a dated bullet into the Open questions section of the Overview page. Each Claude Code session in the vault starts with a short status: recent log entries, page counts, how many ingests since the last lint, stale pages and the most wanted pages. When the ingest count is high, lint.
 
-**Review a page.** When you have read a page against its sources and it holds, verify it. Your name and the date go into the page. Only you can do this. Claude cannot mark a page verified, so "verified" always means a person looked. Query then counts that page as checked. If a later source changes the page, lint flags the review as outdated and you look again.
+**Review a page.** When you have read a page against its sources and it holds, verify it. Your name and the date go into the page. Only you can do this. Every way Claude could write that block is refused, including the small script that writes it, so Claude checks the page over with you, then hands you one line to run yourself. That is what makes "verified" mean a person looked. Query then counts that page as checked. If a later source changes the page, lint flags the review as outdated and you look again.
 
-**When Claude gets stopped.** Now and then Claude will report that the plugin refused an action. That is the guard rails working. Claude cannot write into `raw/`, cannot touch the verified block, cannot remove a source from a page's list, and cannot end a turn while wiki changes sit unlogged. The same applies through the shell: an in-place edit of a page with `sed`, a redirection into one, an inline `python3 -c` are all refused, so every page write goes through a path the guards can read. Deleting or moving a whole page is not refused, because that is a legitimate act and git records it. If a source file really needs changing, edit it yourself in Obsidian or your editor. The guard only stops Claude.
+**When Claude gets stopped.** Now and then Claude will report that the plugin refused an action. That is the guard rails working. Claude cannot write into `raw/`, cannot touch the verified block, cannot remove a source from a page's list, cannot run the verify script, and cannot end a turn while wiki changes sit unlogged. The same applies through the shell: an in-place edit of a page with `sed`, a redirection into one, an inline `python3 -c` are all refused, so every page write goes through a path the guards can read. Deleting or moving a whole page is not refused, because that is a legitimate act and git records it. If a source file really needs changing, edit it yourself in Obsidian or your editor. The guard only stops Claude.
+
+The log guard is softer than the write guards. At the end of a turn, Claude is stopped when it changed pages that no new log entry names, and it is stopped once per problem: if it ends the turn again having changed nothing, the turn ends. It also keeps its notes for the session in a scratch folder outside the vault, so that git only ever holds your wiki; if your machine clears that folder mid-session, the reminder goes quiet until the next one. It is a reminder, not a lock. The write guards work by refusing the tools Claude writes with, which covers the ways a model actually goes wrong, but a model determined to get around them could still write a little program of its own and run it. What the guards buy you is that the honest path is the easy one, and that anything else would show up in the log and the diff.
 
 ## What's in the box
 
@@ -90,7 +112,7 @@ Day to day, the work is a loop: collect, ingest, read, ask, tidy, review. Most d
 | Skill | `lint` | Structural fixes by script, semantic findings by Claude, filed as open questions |
 | Skill | `verify` | Record your review of a page |
 | Hook | SessionStart | Shows recent log entries, page counts, stale pages and most-wanted pages |
-| Hook | PreToolUse | Blocks writes into `raw/`, in-place shell edits of pages, changes to `verified`, and shrinking a page's sources |
+| Hook | PreToolUse | Blocks writes into `raw/`, in-place shell edits of pages, changes to `verified`, the verify script, and shrinking a page's sources |
 | Hook | PostToolUse | Warns about invalid frontmatter, removed headings and links that look like typos |
 | Hook | Stop | Refuses to end a turn with unlogged wiki changes or a new page nobody links to, every turn |
 
@@ -104,6 +126,12 @@ cd example-vault
 ```
 
 The example vault also serves as the maintainer's own wiki, so it keeps receiving sources.
+
+## Two ideas combined
+
+The workflow comes from Andrej Karpathy's [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) idea: keep a wiki between the reader and the sources, ingest into it, answer from it with citations, and check it now and then for contradictions and gaps. That gist is the first source in the example wiki.
+
+The metadata comes from Google's [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format) (OKF). Every page records who wrote it, who verified it, which sources it rests on, and when it goes stale, in a small set of frontmatter fields. Karpathy's pattern has no way to tell a page Claude wrote from a page you checked; OKF has no immutable source layer and no notion of two sources disagreeing. Each fills the other's gap, so this plugin uses both.
 
 ## Credits and licence
 

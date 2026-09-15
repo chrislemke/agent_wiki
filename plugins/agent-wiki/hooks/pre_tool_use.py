@@ -4,10 +4,11 @@
 File tools (Write, Edit, MultiEdit, NotebookEdit): deny any path inside raw/. For pages
 inside wiki/, compute the post-write frontmatter and deny when `verified` differs from
 disk or `sources` loses an entry. Snapshot the file's headings into session state.
-Bash: deny write-like commands whose target is inside raw/ or inside wiki/ (patterns in
-bash_patterns.json), unless the command invokes an allowlisted plugin script. The wiki
-layer skips rm, mv and the git write verbs: deleting or moving a whole page is legitimate
-and visible in git, while an in-place edit would slip past the verified and sources guards.
+Bash: deny write-like commands whose target is inside raw/ or inside wiki/, and calls to
+verify.py wherever they run (patterns in bash_patterns.json), unless the command invokes an
+allowlisted plugin script. The wiki layer skips rm, mv and the git write verbs: deleting or
+moving a whole page is legitimate and visible in git, while an in-place edit would slip past
+the verified and sources guards.
 Exit 0 always; denials are JSON on stdout. Silent outside a vault.
 """
 from __future__ import annotations
@@ -122,7 +123,7 @@ def guard_page(root: Path, path: Path, event: Dict[str, Any]) -> Optional[str]:
 
 
 HEREDOC_INTERPRETER_RE = re.compile(r"\b(?:python3?|node|ruby|perl)\s+(?:-\s+)?<<")
-CD_RE = re.compile(r"(?:^|\s)cd(?:\s|$)")
+CD_RE = re.compile(r"(?:^|\s)(?:cd|pushd|popd)(?:\s|$)")
 
 
 def split_segments(command: str) -> List[str]:
@@ -156,6 +157,8 @@ def split_segments(command: str) -> List[str]:
             buf = []
             i += 2
             continue
+        elif ch == "|" and buf and buf[-1] == ">":
+            buf.append(ch)  # `>|` is zsh's clobber operator, not a pipe
         elif ch in ";|\n":
             segments.append("".join(buf))
             buf = []
@@ -202,9 +205,22 @@ def _guard_layer(cfg: Dict[str, Any], layer: Dict[str, Any], command: str, cwd_i
     return None
 
 
+def _guard_always(cfg: Dict[str, Any], command: str) -> Optional[str]:
+    """Rules about the command itself rather than a layer: they carry no TARGET, match wherever
+    they run, and are judged before the raw/SOURCES.md exemption, which only excuses a raw path."""
+    for segment in split_segments(command):
+        for rule in cfg.get("deny_always", []):
+            if re.search(rule["pattern"], segment):
+                return str(rule["reason"])
+    return None
+
+
 def guard_bash(root: Path, command: str, cwd: Path) -> Optional[str]:
-    """Deny write-like operations on raw/ and on wiki/, in that order."""
+    """Deny the always-blocked commands, then write-like operations on raw/ and on wiki/."""
     cfg = json.loads(PATTERNS.read_text(encoding="utf-8"))
+    reason = _guard_always(cfg, command)
+    if reason:
+        return reason
     reason = _guard_layer(cfg, cfg["layers"]["raw"], command, V.in_raw(root, cwd), V.SOURCES_LIST)
     if reason:
         return reason

@@ -120,13 +120,14 @@ literals are checked against all of the page's sources. Lint checks that every
 footnote resolves and every definition is used.
 
 **D17. Verification is a control, not a convention.** `verified` is set only by
-the `verify` skill (a plugin script) or by a human editing the file. The skill
-is user-invoked, so the model cannot decide on its own that the owner reviewed
-a page. A hook denies any write from the LLM that changes `verified`, falling
-back to a textual comparison when the written frontmatter does not even parse.
-That covers the file tools and, because in-place Bash writes into `wiki/` are
-denied outright, the shell as well: every page write reaches a path the guard
-can read. Approving an ingest plan
+a plugin script the owner runs themselves, or by a human editing the file. The
+`verify` skill is user-invoked and prepares the review, but the Bash guard
+denies `verify.py` to the model, so the model can neither decide on its own that
+the owner reviewed a page nor stamp one on their behalf. A hook denies any write
+from the LLM that changes `verified`, falling back to a textual comparison when
+the written frontmatter does not even parse. That covers the file tools and,
+because in-place Bash writes into `wiki/` are denied outright, the shell as
+well: every page write reaches a path the guard can read. Approving an ingest plan
 is not reading the page, so it does not verify anything. Lint flags a page
 whose `generated.at` is later than its last `verified.at` as "review outdated";
 OKF treats the two as independent, which is precisely the hazard.
@@ -259,22 +260,27 @@ silent outside a vault:
   lint, stale pages and the most wanted pages.
 - PreToolUse denies writes into `raw/` from Write, Edit, MultiEdit and from
   write-like Bash commands (in-place sed, mv, cp, rm, tee, redirections, inline
-  interpreters), with the plugin's fetch, verify and scaffold scripts
-  allowlisted and `raw/SOURCES.md` exempt, since it is a list of sources rather
-  than a source. The same pattern list guards `wiki/`, minus `rm`, `mv` and the
-  git write verbs: an in-place shell edit would slip past the `verified` and
-  `sources` guards, while deleting or moving a whole page is legitimate and
-  visible in git. A shell already sitting inside a layer is judged by the
-  event's `cwd`, not only by a `cd` in the command, because the Bash tool's
-  working directory persists between calls. It also denies writes that change
-  `verified` or shrink `sources`.
+  interpreters, downloaders, `find -delete`, directory and mode changes), with
+  the plugin's fetch and scaffold scripts allowlisted and `raw/SOURCES.md`
+  exempt, since it is a list of sources rather than a source. Every rule is
+  written against the TARGET token, so it still fires after a `cd` into the
+  layer. The same pattern list guards `wiki/`, minus `rm`, `mv`, the git write
+  verbs and the directory and mode changes: an in-place shell edit would slip
+  past the `verified` and `sources` guards, while deleting or moving a whole
+  page is legitimate and visible in git, and a directory or a mode can forge
+  neither a review nor a source. A shell already sitting inside a layer is
+  judged by the event's `cwd`, not only by a `cd` in the command, because the
+  Bash tool's working directory persists between calls. It also denies writes
+  that change `verified` or shrink `sources`, and denies `verify.py` itself
+  wherever it runs: stamping a human review is the owner's own act.
 - PostToolUse warns on invalid frontmatter, frontmatter comments that
   normalising would drop, removed top-level headings and near-miss link
   targets. It never undoes a write.
 - Stop blocks once per turn's problem set when wiki files changed without a log
-  entry, or when a page created in the turn has no inbound link. Every Stop
-  that passes opens a fresh accounting window, so the gate judges each turn
-  rather than only the first one.
+  entry, when a changed page is named by no new entry, or when a page created
+  in the turn has no inbound link. Every Stop that passes opens a fresh
+  accounting window, so the gate judges each turn rather than only the first
+  one.
 
 **D37. Graded strictness.** Raw immutability, `verified` and `sources`
 shrinkage are hard denials. Everything else is a warning the model must answer.

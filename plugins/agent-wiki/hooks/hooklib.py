@@ -3,9 +3,12 @@
 Session state is one JSON file per session id, kept outside the vault in the system
 temporary directory (override with AGENT_WIKI_STATE_DIR). It records pages created and
 touched since the current accounting window opened, pre-write heading snapshots, the log
-hash the window opened with, and the signature of the last Stop block so the gate never
-loops. A window opens at SessionStart and again after every Stop that passes, so each
-Stop judges only the work done since the previous one.
+hash and entry count the window opened with, and the signature of the last Stop block so
+the gate never loops. A window opens at SessionStart and again after every Stop that
+passes, so each Stop judges only the work done since the previous one.
+
+Losing the state file mid-session (a cleaned temp directory) resets the gate silently:
+state deliberately lives outside the vault, so this is a stated limit, not a bug.
 """
 from __future__ import annotations
 
@@ -16,11 +19,12 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PLUGIN_ROOT / "scripts"))
 import frontmatter as FM  # noqa: E402
+import log as LOG  # noqa: E402
 import vault as V  # noqa: E402
 
 HEADING_RE = re.compile(r"^(#{1,2})\s+(.+?)\s*$", re.M)
@@ -91,6 +95,7 @@ class SessionState:
             "existed": {},
             "headings": {},
             "log_hash_at_start": None,
+            "log_entries_at_start": None,
             "last_block_signature": None,
         }
         if self.path.is_file():
@@ -102,6 +107,8 @@ class SessionState:
                 pass
         if self.data.get("log_hash_at_start") is None:
             self.data["log_hash_at_start"] = file_hash(root / "log.md") or ""
+        if self.data.get("log_entries_at_start") is None:
+            self.data["log_entries_at_start"] = len(LOG.parse(root))
 
     def save(self) -> None:
         self.path.write_text(json.dumps(self.data, indent=2), encoding="utf-8")
@@ -136,7 +143,23 @@ class SessionState:
         self.data["existed"] = {}
         self.data["headings"] = {}
         self.data["log_hash_at_start"] = file_hash(self.root / "log.md") or ""
+        self.data["log_entries_at_start"] = len(LOG.parse(self.root))
         self.data["last_block_signature"] = None
+
+    def logged_names(self) -> Set[str]:
+        """Page names named by a `Created:` or `Updated:` line added in the current window.
+
+        An entry about some other page no longer satisfies the gate for the pages that changed.
+        """
+        entries = LOG.parse(self.root)
+        start = int(self.data.get("log_entries_at_start") or 0)
+        names: Set[str] = set()
+        for entry in entries[start:] if start <= len(entries) else entries:
+            for item in list(entry.get("created") or []) + list(entry.get("updated") or []):
+                name = str(item).split("|", 1)[0].strip()
+                if name:
+                    names.add(name.casefold())
+        return names
 
     @property
     def touched(self) -> List[str]:
